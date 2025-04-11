@@ -3,4 +3,4 @@ have a on/off switch for a brush that will spawn in electrons within the brush c
     -maybe have the brush be turned off or on with a button press instead like "b"
 
 implement neutrons with electrostatic force, strong nuclear force, and all the good stuff that is really complecated
-
+make explosion when two particles collide above a cerain speed

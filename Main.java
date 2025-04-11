@@ -17,14 +17,24 @@ public class Main {
 
         rand = new Random();
 
+
+
+        // Drawing Particles -----------------------------------------------------------------------------------------------------------------
+
+
+
         panel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 for (Particle p : particles) {
-                    if (p.getCharge() > 0) {
+                    if (p.getCharge() == 0) {
+                        g.setColor(Color.GRAY);
+                    }
+                    else if (p.getCharge() > 0) {
                         g.setColor(Color.RED); // Positive charge
-                    } else {
+                    } 
+                    else {
                         g.setColor(Color.BLUE); // Negative charge
                     }
                     g.fillOval((int) p.getxCor(), (int) p.getyCor(), 10, 10);
@@ -34,6 +44,12 @@ public class Main {
         panel.setBackground(Color.LIGHT_GRAY);
         panel.setFocusable(true);
 
+
+
+        // Sliders and Labels -----------------------------------------------------------------------------------------------------------------
+
+
+        
         JPanel sliderPanel = new JPanel();
         sliderPanel.setLayout(new BoxLayout(sliderPanel, BoxLayout.Y_AXIS));
 
@@ -86,17 +102,21 @@ public class Main {
         topPanel.add(topRightPanel);
         panel.add(topPanel, BorderLayout.NORTH);
 
-        // Key bindings for spawning particles
+
+
+        // Key bindings -----------------------------------------------------------------------------------------------------------------
+        
+        
+
         panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, 0), "spawnElectron");
         panel.getActionMap().put("spawnElectron", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 Point p = MouseInfo.getPointerInfo().getLocation();
                 SwingUtilities.convertPointFromScreen(p, panel);
-                // Add slight random offset to avoid exact overlap
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), -1.6e-15, 9.109e-29); // Original = -1.6-19 AND 9.109e-31
+                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), -1.6e-15, 9.109e-29, "electron"); // Original = -1.6-19 AND 9.109e-31
                 particles.add(electron);
             }
         });
@@ -109,8 +129,21 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle proton = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), 1.6e-15, 1.67262158e-27); // Original = -1.6-19 AND 1.67262158e-29
+                Particle proton = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), 1.6e-15, 1.67262158e-27, "proton"); // Original = -1.6-19 AND 1.67262158e-29
                 particles.add(proton);
+            }
+        });
+
+        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_N, 0), "spawnNeutron");
+        panel.getActionMap().put("spawnNeutron", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Point p = MouseInfo.getPointerInfo().getLocation();
+                SwingUtilities.convertPointFromScreen(p, panel);
+                double offsetX = rand.nextDouble(-5, 5);
+                double offsetY = rand.nextDouble(-5, 5);
+                Particle neutron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), 0, 1.67492749804e-25, "neutron"); // Original = 0 AND 1.67492749804e-29
+                particles.add(neutron);
             }
         });
 
@@ -122,28 +155,56 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue() * 1e-15, massSlider.getValue() * 1e-29); // Original = -1.6-19 AND 1.67262158e-29
+                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue() * 0, massSlider.getValue() * 1.6726e-25, "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
                 particles.add(chargedParticle);
             }
         });
 
         frame.add(panel);
         frame.setVisible(true);
-
         SwingUtilities.invokeLater(() -> panel.requestFocusInWindow());
 
-        // Timer for physics update and repaint
+
+
+        // Main Loop ---------------------------------------------------------------------------------------------------
+
+
+
         new Timer(16, e -> {
             // Update physics
             for (int i = 0; i < particles.size(); i++) {
                 for (int j = i + 1; j < particles.size(); j++) {
-                    particles.get(i).culombLaw(particles.get(j));
+                    Particle p1 = particles.get(i);
+                    Particle p2 = particles.get(j);
+
+                    // Collision Check
+                    double radius_minimum = 10.0;
+                    double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
+                    if (dist < radius_minimum) {
+                        double overlap = radius_minimum - dist;
+                        double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+
+                        double offsetX = Math.cos(angle) * (overlap / 2);
+                        double offsetY = Math.sin(angle) * (overlap / 2);
+
+                        p1.xCor -= offsetX;
+                        p1.yCor -= offsetY;
+                        p2.xCor += offsetX;
+                        p2.yCor += offsetY;
+                    }
+
+                    p1.culombLaw(p2);
+                    if ((p1.getParticleType().equals("proton") && p2.getParticleType().equals("neutron")) || 
+                       (p1.getParticleType().equals("neutron") && p2.getParticleType().equals("proton")) || 
+                       (p1.getParticleType().equals("proton") && p2.getParticleType().equals("proton")) ||
+                       (p1.getParticleType().equals("neutron") && p2.getParticleType().equals("neutron"))) {
+                        p1.strongNuclearForce(p2);
+                    }
                 }
             }
             for (Particle p : particles) {
                 p.updatePos();
             }
-            // Repaint
             frame.repaint();
         }).start();
     }

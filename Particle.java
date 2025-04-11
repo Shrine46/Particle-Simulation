@@ -5,15 +5,17 @@ public class Particle {
     protected double yVel;
     protected double mass;
     protected double charge;
-    private static final double DT = 0.016; // Time step (~60 FPS)
+    protected String particleType;
+    public static final double DT = 0.016; // Time step (~60 FPS)
 
-    public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass) {
+    public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
         this.yCor = yCor;
         this.xVel = xVel;
         this.yVel = yVel;
         this.charge = charge;
         this.mass = mass;
+        this.particleType = particleType;
     }
 
     public void updatePos() {
@@ -22,8 +24,8 @@ public class Particle {
         xCor += xVel * DT;
         yCor += yVel * DT;
 
-        if (xCor < 0 || xCor > 1920) xCor = xCor%1920;
-        if (yCor < 0 || yCor > 1080) yCor = yCor%1080;
+        if (xCor < 0 || xCor > 1920) xCor = (xCor + 1920) % 1920;
+        if (yCor < 0 || yCor > 1080) yCor = (yCor + 1080) % 1080;
     }
 
     public void culombLaw(Particle p2) {
@@ -32,27 +34,64 @@ public class Particle {
         double charge2 = p2.getCharge();
         double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
 
-        // Prevent division by zero and cap minimum distance
         if (dist < 1e-9) {
-            dist = 1e-9;
+            dist = 1e-4;
             System.out.println("Distance was near zero");
         }
-
         double k = 8.99e7; // Original = 8.99e9
-        double force = (k * charge1 * charge2) / Math.pow(dist, 2); // Note: Includes sign for attraction/repulsion
+        double force = (k * charge1 * charge2) / (Math.pow(dist, 2) + Math.pow(5, 2));
         double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
 
-        // Force components
+        force *= .5; // Adujust Force
+
         double xForce = force * Math.cos(angle);
         double yForce = force * Math.sin(angle);
 
-        // Apply acceleration to both particles (Newton's third law)
         double xAccel1 = -xForce / p1.getMass();
         double yAccel1 = -yForce / p1.getMass();
-        double xAccel2 = xForce / p2.getMass(); // Opposite direction for p2
+        double xAccel2 = xForce / p2.getMass();
         double yAccel2 = yForce / p2.getMass();
 
-        // Update velocities with time step
+        p1.setxVel(p1.getxVel() + xAccel1 * DT);
+        p1.setyVel(p1.getyVel() + yAccel1 * DT);
+        p2.setxVel(p2.getxVel() + xAccel2 * DT);
+        p2.setyVel(p2.getyVel() + yAccel2 * DT);
+    }
+
+    public void strongNuclearForce (Particle p2) {
+        Particle p1 = this;
+
+        double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
+
+        if (dist > 30) {
+            return;
+        }
+
+        if (dist < 1) {
+            dist = 0.1;
+        }
+
+        double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+        double g = 0.3; // Coupling Strength
+        double mu = 0.1; // Constant
+
+        double force = g * g * (Math.exp(-mu * dist) / (dist * dist) + mu * Math.exp(-mu * dist) / dist);
+        double repellingForce = 900 / Math.pow(dist, 6);
+
+        force -= repellingForce;
+
+        force *= 1e-21; // Scale it down or it goes super fast
+        
+        
+
+        double xForce = force * Math.cos(angle);
+        double yForce = force * Math.sin(angle);
+
+        double xAccel1 = xForce / p1.getMass();
+        double yAccel1 = yForce / p1.getMass();
+        double xAccel2 = -xForce / p2.getMass();
+        double yAccel2 = -yForce / p2.getMass();
+
         p1.setxVel(p1.getxVel() + xAccel1 * DT);
         p1.setyVel(p1.getyVel() + yAccel1 * DT);
         p2.setxVel(p2.getxVel() + xAccel2 * DT);
@@ -106,5 +145,13 @@ public class Particle {
 
     public void setCharge(double charge) {
         this.charge = charge;
+    }
+
+    public String getParticleType() {
+        return particleType;
+    }
+
+    public void setParticleType(String particleType) {
+        this.particleType = particleType;
     }
 }
