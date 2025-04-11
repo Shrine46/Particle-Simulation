@@ -6,7 +6,18 @@ public class Particle {
     protected double mass;
     protected double charge;
     protected String particleType;
+
+    // Constants
     public static final double DT = 0.016; // Time step (~60 FPS)
+    protected static final double MAX_SPEED = 1000;
+    protected double kConstant = 8.99e7; // Original = 8.99e9
+    protected double gConstant = 0.3; // Coupling Strength
+    protected double muConstant = 0.1; // Constant
+    protected double StrongForceAdjustment = 1e-21;
+
+
+
+
 
     public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
@@ -19,6 +30,11 @@ public class Particle {
     }
 
     public void updatePos() {
+        double speed = Math.sqrt(xVel*xVel + yVel*yVel);
+        if (speed > MAX_SPEED) {
+            xVel *= MAX_SPEED / speed;
+            yVel *= MAX_SPEED / speed;
+        }
         xVel *= .99; // Drag
         yVel *= .99;
         xCor += xVel * DT;
@@ -38,11 +54,10 @@ public class Particle {
             dist = 1e-4;
             System.out.println("Distance was near zero");
         }
-        double k = 8.99e7; // Original = 8.99e9
-        double force = (k * charge1 * charge2) / (Math.pow(dist, 2) + Math.pow(5, 2));
+        double force = (kConstant * charge1 * charge2) / (Math.pow(dist, 2) + Math.pow(5, 2));
         double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
 
-        force *= .5; // Adujust Force
+        force *= .5; // Adjust Force
 
         double xForce = force * Math.cos(angle);
         double yForce = force * Math.sin(angle);
@@ -68,17 +83,16 @@ public class Particle {
         }
 
         double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
-        double g = 0.3; // Coupling Strength
-        double mu = 0.1; // Constant
 
-        double force = g * g * (Math.exp(-mu * dist) / (dist * dist) + mu * Math.exp(-mu * dist) / dist);
+
+        double force = gConstant * gConstant * (Math.exp(-muConstant * dist) / (dist * dist) + muConstant * Math.exp(-muConstant * dist) / dist);
         double repellingForce = 900 / Math.pow(dist, 6);
 
         force -= repellingForce;
 
-        force *= 1e-21; // Scale it down or it goes super fast
-        
-        
+        force *= StrongForceAdjustment; // Scale it down or it goes superfast
+
+
 
         double xForce = force * Math.cos(angle);
         double yForce = force * Math.sin(angle);

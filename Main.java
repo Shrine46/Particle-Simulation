@@ -155,7 +155,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue() * 0, massSlider.getValue() * 1.6726e-25, "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
+                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue() * 1e-15, massSlider.getValue() * 1.6726e-25, "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
                 particles.add(chargedParticle);
             }
         });
