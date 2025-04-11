@@ -1,58 +1,70 @@
-
-
 public class Particle {
-    protected int xCor; // x coordinate of the particle
-    protected int yCor; // y coordinate of the particle
-    protected double xVel; // x velocity of the particle
-    protected double yVel; // y velocity of the particle
+    protected double xCor; // Use double for smoother motion
+    protected double yCor;
+    protected double xVel;
+    protected double yVel;
     protected double mass;
-    protected double angle;
     protected double charge;
+    private static final double DT = 0.016; // Time step (~60 FPS)
 
-    public Particle(int xCor, int yCor, double xVel, double yVel, double charge) {
+    public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass) {
         this.xCor = xCor;
         this.yCor = yCor;
         this.xVel = xVel;
         this.yVel = yVel;
         this.charge = charge;
-        this.angle = Math.atan2(yVel, xVel);
+        this.mass = mass;
     }
 
-    public void culombLaw(Particle p2) { // Culomb's law = (k * q1 * q2) / r^2
+    public void updatePos() {
+        xVel *= .99; // Drag
+        yVel *= .99;
+        xCor += xVel * DT;
+        yCor += yVel * DT;
+
+        if (xCor < 0 || xCor > 1920) xCor = xCor%1920;
+        if (yCor < 0 || yCor > 1080) yCor = yCor%1080;
+    }
+
+    public void culombLaw(Particle p2) {
         Particle p1 = this;
         double charge1 = p1.getCharge();
         double charge2 = p2.getCharge();
         double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
-    
-        if (dist == 0) {
+
+        // Prevent division by zero and cap minimum distance
+        if (dist < 1e-9) {
             dist = 1e-9;
-            System.out.println("Distance was 0");
+            System.out.println("Distance was near zero");
         }
-    
-        double k = 8.99e9;
-        double force = (k * Math.abs(charge1) * Math.abs(charge2)) / Math.pow(dist, 2);
+
+        double k = 8.99e7; // Original = 8.99e9
+        double force = (k * charge1 * charge2) / Math.pow(dist, 2); // Note: Includes sign for attraction/repulsion
         double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+
+        // Force components
         double xForce = force * Math.cos(angle);
         double yForce = force * Math.sin(angle);
-    
-        if (charge1 * charge2 < 0) { // Opposite charges
-            p1.setAngle(angle);
-        } 
-        else {
-            p2.setAngle(angle * -1);
-        }
-    
-        double xAccel = xForce / p1.getMass();
-        double yAccel = yForce / p1.getMass();
-        p1.setxVel(p1.getxVel() + xAccel);
-        p1.setyVel(p1.getyVel() + yAccel);
+
+        // Apply acceleration to both particles (Newton's third law)
+        double xAccel1 = -xForce / p1.getMass();
+        double yAccel1 = -yForce / p1.getMass();
+        double xAccel2 = xForce / p2.getMass(); // Opposite direction for p2
+        double yAccel2 = yForce / p2.getMass();
+
+        // Update velocities with time step
+        p1.setxVel(p1.getxVel() + xAccel1 * DT);
+        p1.setyVel(p1.getyVel() + yAccel1 * DT);
+        p2.setxVel(p2.getxVel() + xAccel2 * DT);
+        p2.setyVel(p2.getyVel() + yAccel2 * DT);
     }
 
+    // Getters and setters
     public double getxCor() {
         return xCor;
     }
 
-    public void setxCor(int xCor) {
+    public void setxCor(double xCor) {
         this.xCor = xCor;
     }
 
@@ -60,7 +72,7 @@ public class Particle {
         return yCor;
     }
 
-    public void setyCor(int yCor) {
+    public void setyCor(double yCor) {
         this.yCor = yCor;
     }
 
@@ -88,14 +100,6 @@ public class Particle {
         this.mass = mass;
     }
 
-    public double getAngle() {
-        return angle;
-    }
-
-    public void setAngle(double angle) {
-        this.angle = angle;
-    }
-
     public double getCharge() {
         return charge;
     }
@@ -103,6 +107,4 @@ public class Particle {
     public void setCharge(double charge) {
         this.charge = charge;
     }
-
-    
 }

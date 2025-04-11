@@ -1,0 +1,6 @@
+have a on/off switch for a brush that will spawn in electrons within the brush circle, (more the bigger the brush)
+    -the brush could be made by having a circle follow the mouse, I don't know if hiding the mouse is possible
+    -maybe have the brush be turned off or on with a button press instead like "b"
+
+implement neutrons with electrostatic force, strong nuclear force, and all the good stuff that is really complecated
+
