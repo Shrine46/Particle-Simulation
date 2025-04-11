@@ -1,23 +1,24 @@
 
 
 public class Particle {
-    protected double xCor; // x coordinate of the particle
-    protected double yCor; // y coordinate of the particle
+    protected int xCor; // x coordinate of the particle
+    protected int yCor; // y coordinate of the particle
     protected double xVel; // x velocity of the particle
     protected double yVel; // y velocity of the particle
     protected double mass;
     protected double angle;
     protected double charge;
 
-    public Particle(double xCor, double yCor, double xVel, double yVel) {
+    public Particle(int xCor, int yCor, double xVel, double yVel, double charge) {
         this.xCor = xCor;
         this.yCor = yCor;
         this.xVel = xVel;
         this.yVel = yVel;
+        this.charge = charge;
         this.angle = Math.atan2(yVel, xVel);
     }
 
-    public void culombForce(Particle p2) { // Culomb's law = (k * q1 * q2) / r^2
+    public void culombLaw(Particle p2) { // Culomb's law = (k * q1 * q2) / r^2
         Particle p1 = this;
         double charge1 = p1.getCharge();
         double charge2 = p2.getCharge();
@@ -51,7 +52,7 @@ public class Particle {
         return xCor;
     }
 
-    public void setxCor(double xCor) {
+    public void setxCor(int xCor) {
         this.xCor = xCor;
     }
 
@@ -59,7 +60,7 @@ public class Particle {
         return yCor;
     }
 
-    public void setyCor(double yCor) {
+    public void setyCor(int yCor) {
         this.yCor = yCor;
     }
 
