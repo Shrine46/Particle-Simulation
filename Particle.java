@@ -60,15 +60,11 @@ public class Particle {
 
     public void strongNuclearForce (Particle p2) {
         Particle p1 = this;
-
         double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
-
         if (dist > 30) {
             return;
-        }
-
-        if (dist < 1) {
-            dist = 0.1;
+        } if (dist < 1) {
+             dist = 0.1;
         }
 
         double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
