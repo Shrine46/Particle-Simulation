@@ -29,8 +29,7 @@ public class Main {
         panel.setBackground(Color.BLACK);
         panel.setFocusable(true); // Ensure the panel is focusable
 
-        // Add KeyBindings
-        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("pressed e"), "spawnElectron");
+        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, 0), "spawnElectron");
         panel.getActionMap().put("spawnElectron", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -41,7 +40,7 @@ public class Main {
             }
         });
 
-        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("pressed p"), "spawnProton");
+        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), "spawnProton");
         panel.getActionMap().put("spawnProton", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -69,6 +68,7 @@ public class Main {
             System.out.println("Panel focusable: " + panel.isFocusable());
             System.out.println("Panel has focus: " + panel.hasFocus());
         });
+        panel.requestFocusInWindow();
     }
 
     public static void main(String[] args) {
