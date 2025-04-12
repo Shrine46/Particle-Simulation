@@ -4,3 +4,7 @@ have a on/off switch for a brush that will spawn in electrons within the brush c
 
 make explosion when two particles collide above a cerain speed
     - Maybe make that generate a outwards force
+
+add a tail to the particles
+
+add sliders to adjust constants

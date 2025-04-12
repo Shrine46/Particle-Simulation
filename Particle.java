@@ -6,8 +6,9 @@ public class Particle {
     protected double mass;
     protected double charge;
     protected String particleType;
+    protected double radius;
 
-    // Store forces to update in simul
+    // Store forces to update
     protected double netX;
     protected double netY;
 
@@ -34,6 +35,9 @@ public class Particle {
         this.charge = charge;
         this.mass = mass;
         this.particleType = particleType;
+
+        if (this.isNucleon()) {this.radius = 9.0;}
+        if (this.isElectron()) {this.radius = 3.0;}
     }
 
     public void updatePos() {
@@ -127,6 +131,10 @@ public class Particle {
 
     public boolean isNucleon() {
         return particleType.equals("proton") || particleType.equals("neutron");
+    }
+
+    public boolean isElectron() {
+        return particleType.equals("electron");
     }
 
     public double getxCor() {

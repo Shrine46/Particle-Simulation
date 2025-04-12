@@ -14,14 +14,14 @@ public class Main {
 
     // Electron
     protected static final double electronCharge = -1; // Original = -1.6-19 
-    protected static final double electronMass = 5.4459; // Original = 9.109e-31
+    protected static final double electronMass = 10; // Original = 9.109e-31
     // Proton
     protected static final double protonCharge = 1; // Original = 1.6e-19
     protected static final double protonMass = 100; // Original = 1.67262158e-29
 
     // Neutron
     protected static final double neutronCharge = 0;
-    protected static final double neutronMass = 120; // Original = 1.67492749804e-29
+    protected static final double neutronMass = 100; // Original = 1.67492749804e-29
     
     
 
@@ -42,17 +42,22 @@ public class Main {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
                 for (Particle p : particles) {
                     if (p.getCharge() == 0) {
-                        g.setColor(Color.GRAY);
+                        g2d.setColor(Color.GRAY);
+                    } else if (p.getCharge() > 0) {
+                        g2d.setColor(Color.RED); // Positive charge
+                    } else {
+                        g2d.setColor(Color.BLUE); // Negative charge
                     }
-                    else if (p.getCharge() > 0) {
-                        g.setColor(Color.RED); // Positive charge
-                    } 
-                    else {
-                        g.setColor(Color.BLUE); // Negative charge
-                    }
-                    g.fillOval((int) p.getxCor(), (int) p.getyCor(), 10, 10);
+                    int diameter = (int) (p.radius * 2);
+                    int topLeftX = (int) (p.getxCor() - p.radius);
+                    int topLeftY = (int) (p.getyCor() - p.radius);
+
+                    g2d.fillOval(topLeftX, topLeftY, diameter, diameter);
                 }
             }
         };
@@ -190,25 +195,50 @@ public class Main {
                     Particle p2 = particles.get(j);
 
                     double[] forceOnP1 = p1.calculateForces(p2);
-
                     p1.addForce(forceOnP1[0], forceOnP1[1]);
-
                     p2.addForce(-forceOnP1[0], -forceOnP1[1]);
 
-                    // Collisions
-                    double radius_minimum = 10.0;
-                    double distSq = (p2.xCor - p1.xCor)*(p2.xCor - p1.xCor) + (p2.yCor - p1.yCor)*(p2.yCor - p1.yCor);
-                    if (distSq > 1e-12 && distSq < radius_minimum * radius_minimum) {
-                        double dist = Math.sqrt(distSq);
-                        double overlap = radius_minimum - dist;
-                        double dirX = (p2.xCor - p1.xCor) / dist;
-                        double dirY = (p2.yCor - p1.yCor) / dist;
+                    double distX = p2.xCor - p1.xCor;
+                    double distY = p2.yCor - p1.yCor;
+                    double distSq = distX * distX + distY * distY;
 
-                        double pushFactor = overlap / 2.0;
-                        p1.xCor -= dirX * pushFactor;
-                        p1.yCor -= dirY * pushFactor;
-                        p2.xCor += dirX * pushFactor;
-                        p2.yCor += dirY * pushFactor;
+                    double collisionRadiusSum = p1.radius + p2.radius;
+                    double collisionRadiusSumSq = collisionRadiusSum * collisionRadiusSum;
+
+                    if (distSq < collisionRadiusSumSq && distSq > 1e-9) { 
+                        double dist = Math.sqrt(distSq);
+
+                        double overlap = collisionRadiusSum - dist;
+                        double dirX = distX / dist;
+                        double dirY = distY / dist;
+
+                        double totalMass = p1.mass + p2.mass;
+                        double pushFactor1 = (p2.mass / totalMass) * overlap;
+                        double pushFactor2 = (p1.mass / totalMass) * overlap;
+
+                        p1.xCor -= dirX * pushFactor1;
+                        p1.yCor -= dirY * pushFactor1;
+                        p2.xCor += dirX * pushFactor2;
+                        p2.yCor += dirY * pushFactor2;
+
+
+                        double relativeVelX = p2.xVel - p1.xVel;
+                        double relativeVelY = p2.yVel - p1.yVel;
+
+                        double dotProduct = relativeVelX * dirX + relativeVelY * dirY;
+
+                        if (dotProduct < 0) {
+                            double restitution = 0.7;
+
+                            double collisionScale = (1.0 + restitution) * dotProduct / totalMass;
+                            double impulseFactorX = collisionScale * dirX;
+                            double impulseFactorY = collisionScale * dirY;
+
+                            p1.xVel += impulseFactorX * p2.mass; 
+                            p1.yVel += impulseFactorY * p2.mass;
+                            p2.xVel -= impulseFactorX * p1.mass;
+                            p2.yVel -= impulseFactorY * p1.mass;
+                        }
                     }
                 }
             }
