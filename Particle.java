@@ -7,17 +7,24 @@ public class Particle {
     protected double charge;
     protected String particleType;
 
+    // Store forces to update in simul
+    protected double netX;
+    protected double netY;
+
     // Constants
     public static final double DT = 0.016; // Time step (~60 FPS)
     protected static final double MAX_SPEED = 1000;
-    protected double kConstant = 8.99e7; // Original = 8.99e9
-    protected double gConstant = 0.3; // Coupling Strength
-    protected double muConstant = 0.1; // Constant
-    protected double StrongForceAdjustment = 1e-21;
 
+    // Coulomb Law
+    protected double kConstant = 4e6; // Original = 8.99e9
 
+    // Strong Force
+    protected double strongForceOuterRadius = 20;
+    protected double strongForceInnerRadius = 12;
+    protected double strongForceConstant = 5e7;
 
-
+    // Gravity
+    protected double gravityConstant = 0.05;
 
     public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
@@ -44,71 +51,84 @@ public class Particle {
         if (yCor < 0 || yCor > 1080) yCor = (yCor + 1080) % 1080;
     }
 
-    public void culombLaw(Particle p2) {
+    public void updateVelocity() {
+        if (this.mass == 0) return; 
+        double accelX = this.netX / this.mass;
+        double accelY = this.netY / this.mass;
+        this.xVel += accelX * DT;
+        this.yVel += accelY * DT;
+    }
+
+    public double[] calculateForces(Particle p2) {
         Particle p1 = this;
+        double forceX = 0;
+        double forceY = 0;
+
+        // Distances
+        double distX = p2.getxCor() - p1.getxCor();
+        double distY = p2.getyCor() - p1.getyCor();
+        double dist = Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
+
+        if (dist < 1e-8) {
+            return new double[] {0,0};
+        }
+
+        double dirX = distX / dist;
+        double dirY = distY / dist;
+
+        // Charges
         double charge1 = p1.getCharge();
         double charge2 = p2.getCharge();
-        double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
 
-        if (dist < 1e-9) {
-            dist = 1e-4;
-            System.out.println("Distance was near zero");
-        }
-        double force = (kConstant * charge1 * charge2) / (Math.pow(dist, 2) + Math.pow(5, 2));
-        double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+        // Culomb Force
+        double coulombForce = (kConstant * charge1 * charge2) / (Math.pow(dist, 2));
+        forceX -= coulombForce * dirX;
+        forceY -= coulombForce * dirY;
 
-        force *= .5; // Adjust Force
+        // Strong Force
+        if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {
+            double strongForce = strongForceConstant / Math.pow(dist, 3);
+            double strongForceX;
+            double strongForceY;
 
-        double xForce = force * Math.cos(angle);
-        double yForce = force * Math.sin(angle);
-
-        double xAccel1 = -xForce / p1.getMass();
-        double yAccel1 = -yForce / p1.getMass();
-        double xAccel2 = xForce / p2.getMass();
-        double yAccel2 = yForce / p2.getMass();
-
-        p1.setxVel(p1.getxVel() + xAccel1 * DT);
-        p1.setyVel(p1.getyVel() + yAccel1 * DT);
-        p2.setxVel(p2.getxVel() + xAccel2 * DT);
-        p2.setyVel(p2.getyVel() + yAccel2 * DT);
-    }
-
-    public void strongNuclearForce (Particle p2) {
-        Particle p1 = this;
-        double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
-        if (dist > 30) {
-            return;
-        } if (dist < 1) {
-             dist = 0.1;
+            if (dist < strongForceInnerRadius) {
+                // Repulsive
+                strongForceX = -strongForce * dirX;
+                strongForceY = -strongForce * dirY;
+            } else {
+                // Attractive
+                strongForceX = strongForce * dirX;
+                strongForceY = strongForce * dirY;
+            }
+            forceX += strongForceX;
+            forceY += strongForceY;
         }
 
-        double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+        // Gravity
+        double gravityForce = (gravityConstant * p1.getMass() * p2.getMass()) / Math.pow(dist, 2);
+        forceX += gravityForce * dirX;
+        forceY += gravityForce * dirY;
 
-
-        double force = gConstant * gConstant * (Math.exp(-muConstant * dist) / (dist * dist) + muConstant * Math.exp(-muConstant * dist) / dist);
-        double repellingForce = 900 / Math.pow(dist, 6);
-
-        force -= repellingForce;
-
-        force *= StrongForceAdjustment; // Scale it down or it goes superfast
-
-
-
-        double xForce = force * Math.cos(angle);
-        double yForce = force * Math.sin(angle);
-
-        double xAccel1 = xForce / p1.getMass();
-        double yAccel1 = yForce / p1.getMass();
-        double xAccel2 = -xForce / p2.getMass();
-        double yAccel2 = -yForce / p2.getMass();
-
-        p1.setxVel(p1.getxVel() + xAccel1 * DT);
-        p1.setyVel(p1.getyVel() + yAccel1 * DT);
-        p2.setxVel(p2.getxVel() + xAccel2 * DT);
-        p2.setyVel(p2.getyVel() + yAccel2 * DT);
+        return new double[] {forceX, forceY};
     }
+
 
     // Getters and setters
+
+    public void resetForce() {
+        this.netX = 0.0;
+        this.netY = 0.0;
+    }
+
+    public void addForce(double forceX, double forceY) {
+        this.netX += forceX;
+        this.netY += forceY;
+    }
+
+    public boolean isNucleon() {
+        return particleType.equals("proton") || particleType.equals("neutron");
+    }
+
     public double getxCor() {
         return xCor;
     }

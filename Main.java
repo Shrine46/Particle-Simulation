@@ -10,6 +10,21 @@ public class Main {
     private static JPanel panel;
     private static Random rand;
 
+    // Constants
+
+    // Electron
+    protected static final double electronCharge = -1; // Original = -1.6-19 
+    protected static final double electronMass = 5.4459; // Original = 9.109e-31
+    // Proton
+    protected static final double protonCharge = 1; // Original = 1.6e-19
+    protected static final double protonMass = 100; // Original = 1.67262158e-29
+
+    // Neutron
+    protected static final double neutronCharge = 0;
+    protected static final double neutronMass = 120; // Original = 1.67492749804e-29
+    
+    
+
     public static void display() {
         frame = new JFrame("Particle Playground");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -62,7 +77,7 @@ public class Main {
         chargeSlider.setPreferredSize(new Dimension(300, 50));
         panel.setLayout(new BorderLayout());
 
-        JLabel massLabel = new JLabel("Mass = 1e-29");
+        JLabel massLabel = new JLabel("1");
         JSlider massSlider = new JSlider(1, 2000, 1);
         massSlider.setMajorTickSpacing(100);
         massSlider.setMinorTickSpacing(10);
@@ -70,19 +85,12 @@ public class Main {
         massSlider.setPreferredSize(new Dimension(300, 50));
 
         chargeSlider.addChangeListener(e -> {
-            String str = ("Charge = " +chargeSlider.getValue() * 1e-15);
-            // Keep label size small
-            String strTemp = str.substring(str.length()-4, str.length());
-            str = str.substring(0, 13);
-            str += strTemp;
+            String str = ("Charge = " +chargeSlider.getValue());
             chargeLabel.setText(str);
         });
 
         massSlider.addChangeListener(e -> {
-            String str = "Mass = " + massSlider.getValue() * 1e-29;
-            String strTemp = str.substring(str.length()-4);
-            str = str.substring(0, 11);
-            str += strTemp;
+            String str = "Mass = " + massSlider.getValue() * 1;
             massLabel.setText(str);
         });
 
@@ -116,7 +124,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), -1.6e-15, 9.109e-29, "electron"); // Original = -1.6-19 AND 9.109e-31
+                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), electronCharge, electronMass, "electron"); 
                 particles.add(electron);
             }
         });
@@ -129,7 +137,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle proton = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), 1.6e-15, 1.67262158e-27, "proton"); // Original = -1.6-19 AND 1.67262158e-29
+                Particle proton = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), protonCharge, protonMass, "proton");
                 particles.add(proton);
             }
         });
@@ -142,7 +150,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle neutron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), 0, 1.67492749804e-25, "neutron"); // Original = 0 AND 1.67492749804e-29
+                Particle neutron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), neutronCharge, neutronMass, "neutron");
                 particles.add(neutron);
             }
         });
@@ -155,7 +163,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue() * 1e-15, massSlider.getValue() * 1.6726e-25, "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
+                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue(), massSlider.getValue(), "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
                 particles.add(chargedParticle);
             }
         });
@@ -171,45 +179,54 @@ public class Main {
 
 
         new Timer(16, e -> {
-            // Update physics
+            // Reset
+            for (Particle p : particles) {
+                p.resetForce();
+            }
+
             for (int i = 0; i < particles.size(); i++) {
                 for (int j = i + 1; j < particles.size(); j++) {
                     Particle p1 = particles.get(i);
                     Particle p2 = particles.get(j);
 
-                    // Collision Check
+                    double[] forceOnP1 = p1.calculateForces(p2);
+
+                    p1.addForce(forceOnP1[0], forceOnP1[1]);
+
+                    p2.addForce(-forceOnP1[0], -forceOnP1[1]);
+
+                    // Collisions
                     double radius_minimum = 10.0;
-                    double dist = Math.sqrt(Math.pow(p2.getxCor() - p1.getxCor(), 2) + Math.pow(p2.getyCor() - p1.getyCor(), 2));
-                    if (dist < radius_minimum) {
+                    double distSq = (p2.xCor - p1.xCor)*(p2.xCor - p1.xCor) + (p2.yCor - p1.yCor)*(p2.yCor - p1.yCor);
+                    if (distSq > 1e-12 && distSq < radius_minimum * radius_minimum) {
+                        double dist = Math.sqrt(distSq);
                         double overlap = radius_minimum - dist;
-                        double angle = Math.atan2(p2.getyCor() - p1.getyCor(), p2.getxCor() - p1.getxCor());
+                        double dirX = (p2.xCor - p1.xCor) / dist;
+                        double dirY = (p2.yCor - p1.yCor) / dist;
 
-                        double offsetX = Math.cos(angle) * (overlap / 2);
-                        double offsetY = Math.sin(angle) * (overlap / 2);
-
-                        p1.xCor -= offsetX;
-                        p1.yCor -= offsetY;
-                        p2.xCor += offsetX;
-                        p2.yCor += offsetY;
-                    }
-
-                    p1.culombLaw(p2);
-                    if ((p1.getParticleType().equals("proton") && p2.getParticleType().equals("neutron")) || 
-                       (p1.getParticleType().equals("neutron") && p2.getParticleType().equals("proton")) || 
-                       (p1.getParticleType().equals("proton") && p2.getParticleType().equals("proton")) ||
-                       (p1.getParticleType().equals("neutron") && p2.getParticleType().equals("neutron"))) {
-                        p1.strongNuclearForce(p2);
+                        double pushFactor = overlap / 2.0;
+                        p1.xCor -= dirX * pushFactor;
+                        p1.yCor -= dirY * pushFactor;
+                        p2.xCor += dirX * pushFactor;
+                        p2.yCor += dirY * pushFactor;
                     }
                 }
             }
+
+            for (Particle p : particles) {
+                p.updateVelocity();
+            }
+
             for (Particle p : particles) {
                 p.updatePos();
             }
+
             frame.repaint();
         }).start();
     }
 
     public static void main(String[] args) {
         display();
+        System.out.println(9.109e-31/1.67262158e-29);
     }
 }
