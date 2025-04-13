@@ -13,19 +13,19 @@ public class Particle {
     protected double netY;
 
     // Constants
-    public static final double DT = 0.016; // Time step (~60 FPS)
+    public static final double DT = 0.016 * 10; // Time step (~60 FPS)
     protected static final double MAX_SPEED = 1000;
 
     // Coulomb Law
-    protected double kConstant = 4e6; // Original = 8.99e9
+    protected double kConstant = 400000; // Original = 8.99e9
 
     // Strong Force
-    protected double strongForceOuterRadius = 20;
-    protected double strongForceInnerRadius = 12;
-    protected double strongForceConstant = 5e7;
+    protected double strongForceOuterRadius = 27;
+    protected double strongForceInnerRadius = 9;
+    protected double strongForceConstant = 600000;
 
     // Gravity
-    protected double gravityConstant = 0.05;
+    protected double gravityConstant = 10;
 
     public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
@@ -37,22 +37,37 @@ public class Particle {
         this.particleType = particleType;
 
         if (this.isNucleon()) {this.radius = 9.0;}
-        if (this.isElectron()) {this.radius = 3.0;}
+        else if (this.isElectron()) {this.radius = 3.0;}
+        else {this.radius = 3 + ((mass + charge) * .05);}
     }
 
     public void updatePos() {
-        double speed = Math.sqrt(xVel*xVel + yVel*yVel);
+        double speed = Math.sqrt(xVel * xVel + yVel * yVel);
         if (speed > MAX_SPEED) {
             xVel *= MAX_SPEED / speed;
             yVel *= MAX_SPEED / speed;
         }
-        xVel *= .99; // Drag
-        yVel *= .99;
+        xVel *= 0.90; // Drag
+        yVel *= 0.90;
         xCor += xVel * DT;
         yCor += yVel * DT;
 
-        if (xCor < 0 || xCor > 1920) xCor = (xCor + 1920) % 1920;
-        if (yCor < 0 || yCor > 1080) yCor = (yCor + 1080) % 1080;
+        // Bounce off walls
+        if (xCor < radius) {
+            xCor = radius;
+            xVel = -xVel;
+        } else if (xCor > 1920 - radius) {
+            xCor = 1920 - radius; 
+            xVel = -xVel; 
+        }
+
+        if (yCor < radius) {
+            yCor = radius; 
+            yVel = -yVel; 
+        } else if (yCor > 1080 - radius) {
+            yCor = 1080 - radius; 
+            yVel = -yVel; 
+        }
     }
 
     public void updateVelocity() {
@@ -88,6 +103,29 @@ public class Particle {
         double coulombForce = (kConstant * charge1 * charge2) / (Math.pow(dist, 2));
         forceX -= coulombForce * dirX;
         forceY -= coulombForce * dirY;
+
+        // Swirl effect
+
+        if (p1.isElectron() && charge2 > 0) {
+            double combinedRadius = p1.radius + p2.radius;
+            if (dist < combinedRadius + 20) {
+                double tangentialForce = coulombForce * .7; 
+                double tangentX = -dirY;
+                double tangentY = dirX;
+
+                if ((p1.getxVel() * tangentX + p1.getyVel() * tangentY) < 0) {
+                    tangentX = -tangentX;
+                    tangentY = -tangentY;
+                }
+
+                forceX += tangentialForce * tangentX;
+                forceY += tangentialForce * tangentY;
+                forceX = -forceX;
+                forceY = -forceY;
+            }
+        }
+        
+        
 
         // Strong Force
         if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {
