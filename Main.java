@@ -257,6 +257,5 @@ public class Main {
 
     public static void main(String[] args) {
         display();
-        System.out.println(9.109e-31/1.67262158e-29);
     }
 }

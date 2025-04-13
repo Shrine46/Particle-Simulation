@@ -14,7 +14,7 @@ public class Particle {
 
     // Constants
     public static final double DT = 0.016 * 10; // Time step (~60 FPS)
-    protected static final double MAX_SPEED = 1000;
+    protected static final double MAX_SPEED = 10000000;
 
     // Coulomb Law
     protected double kConstant = 400000; // Original = 8.99e9

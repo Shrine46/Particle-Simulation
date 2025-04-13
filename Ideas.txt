@@ -8,3 +8,5 @@ make explosion when two particles collide above a cerain speed
 add a tail to the particles
 
 add sliders to adjust constants
+
+add fps slider
