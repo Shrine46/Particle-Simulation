@@ -9,8 +9,20 @@ public class Main {
     private static JFrame frame;
     private static JPanel panel;
     private static Random rand;
+    private static Timer timer;
 
-    // Constants
+    // Slider Values
+    private static JSlider maxSpeedSlider;
+    private static JSlider maxSpeedMultSlider;
+    private static JSlider strongForceInnerRadiusSlider;
+    private static JSlider FPSSlider;
+    private static JSlider strongForceOuterRadiusSlider;
+    private static JSlider kConstantSlider;
+    private static JSlider kConstantMultSlider;
+    private static JSlider strongForceConstantSlider;
+    private static JSlider strongForceConstantMultSlider;
+    private static JSlider gravityConstantSlider;
+    private static JSlider gravityConstantMultSlider;
 
     // Electron
     protected static final double electronCharge = -1; // Original = -1.6-19 
@@ -22,6 +34,55 @@ public class Main {
     // Neutron
     protected static final double neutronCharge = 0;
     protected static final double neutronMass = 100; // Original = 1.67492749804e-29
+
+    public static double getMaxSpeed() {
+        if (maxSpeedSlider == null || maxSpeedMultSlider == null) {
+            return 1e7; // Default max speed
+        }
+        return maxSpeedSlider.getValue() * Math.pow(10, maxSpeedMultSlider.getValue());
+    }
+
+    public static double getStrongForceOuterRadius() {
+        if (strongForceOuterRadiusSlider == null) {
+            return 27; // Default strong force outer radius
+        }
+        return strongForceOuterRadiusSlider.getValue();
+    }
+
+    public static double getStrongForceInnerRadius() {
+        if (strongForceInnerRadiusSlider == null) {
+            return 9; // Default strong force inner radius
+        }
+        return strongForceInnerRadiusSlider.getValue();
+    }
+    
+    public static int getFPS() {
+        if (FPSSlider == null) {
+            return 60; // Default FPS
+        }
+        return FPSSlider.getValue();
+    }
+
+    public static double getCoulombConstant() {
+        if (kConstantSlider == null || kConstantMultSlider == null) {
+            return 4e5; // Default Coulomb constant
+        }
+        return kConstantSlider.getValue() * Math.pow(10, kConstantMultSlider.getValue());
+    }
+    
+    public static double getStrongForceConstant() {
+        if (strongForceConstantSlider == null || strongForceConstantMultSlider == null) {
+            return 6e5; // Default strong force constant
+        }
+        return strongForceConstantSlider.getValue() * Math.pow(10, strongForceConstantMultSlider.getValue());
+    }
+    
+    public static double getGravityConstant() {
+        if (gravityConstantSlider == null || gravityConstantMultSlider == null) {
+            return 1e1; // Default gravity constant
+        }
+        return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
+    }
     
     
 
@@ -73,32 +134,6 @@ public class Main {
         JPanel sliderPanel = new JPanel();
         sliderPanel.setLayout(new BoxLayout(sliderPanel, BoxLayout.Y_AXIS));
 
-        
-        JLabel chargeLabel = new JLabel("Charge = 0");
-        JSlider chargeSlider = new JSlider(-100, 100, 0);
-        chargeSlider.setMajorTickSpacing(10);
-        chargeSlider.setMinorTickSpacing(1);
-        chargeSlider.setOrientation(SwingConstants.HORIZONTAL);
-        chargeSlider.setPreferredSize(new Dimension(300, 50));
-        panel.setLayout(new BorderLayout());
-
-        JLabel massLabel = new JLabel("1");
-        JSlider massSlider = new JSlider(1, 2000, 1);
-        massSlider.setMajorTickSpacing(100);
-        massSlider.setMinorTickSpacing(10);
-        massSlider.setOrientation(SwingConstants.HORIZONTAL);
-        massSlider.setPreferredSize(new Dimension(300, 50));
-
-        chargeSlider.addChangeListener(e -> {
-            String str = ("Charge = " +chargeSlider.getValue());
-            chargeLabel.setText(str);
-        });
-
-        massSlider.addChangeListener(e -> {
-            String str = "Mass = " + massSlider.getValue() * 1;
-            massLabel.setText(str);
-        });
-
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topPanel.setOpaque(false);
 
@@ -106,11 +141,186 @@ public class Main {
         topRightPanel.setLayout(new BoxLayout(topRightPanel, BoxLayout.Y_AXIS));
         topRightPanel.setOpaque(false);
 
+
+        // Charge Slider
+        JLabel chargeLabel = new JLabel("Charge = 0");
+        JSlider chargeSlider = new JSlider(-100, 100, 0);
+        chargeSlider.setOrientation(SwingConstants.HORIZONTAL);
+        chargeSlider.setPreferredSize(new Dimension(300, 50));
+        panel.setLayout(new BorderLayout());
+
+        chargeSlider.addChangeListener(e -> {
+            String str = ("Charge = " +chargeSlider.getValue());
+            chargeLabel.setText(str);
+        });
+
         topRightPanel.add(chargeLabel);
         topRightPanel.add(chargeSlider);
 
+        // Mass Slider
+        JLabel massLabel = new JLabel("1");
+        JSlider massSlider = new JSlider(1, 2000, 1);
+
+        massSlider.setOrientation(SwingConstants.HORIZONTAL);
+        massSlider.setPreferredSize(new Dimension(300, 50));
+        massSlider.addChangeListener(e -> {
+            String str = "Mass = " + massSlider.getValue() * 1;
+            massLabel.setText(str);
+        });
+
         topRightPanel.add(massLabel);
         topRightPanel.add(massSlider);
+
+        // Decay Slider
+        JLabel decayLabel = new JLabel("Decay Speed = 0");
+        JSlider decaySlider = new JSlider(0, 100, 0);
+        decaySlider.setOrientation(SwingConstants.HORIZONTAL);
+        decaySlider.setPreferredSize(new Dimension(300, 50));
+        decaySlider.addChangeListener(e -> {
+            String str = "Decay Speed = " + decaySlider.getValue();
+            decayLabel.setText(str);
+        });
+
+        topRightPanel.add(decayLabel);
+        topRightPanel.add(decaySlider);
+
+        // FPS Slider
+        JLabel FPSLabel = new JLabel("FPS = " + 60);
+        FPSSlider = new JSlider(1, 540, 60);
+        FPSSlider.setOrientation(SwingConstants.HORIZONTAL);
+        FPSSlider.setPreferredSize(new Dimension(300, 50));
+        FPSSlider.addChangeListener(e -> {
+            FPSLabel.setText("FPS = " + FPSSlider.getValue());
+
+            timer.stop();
+
+            timer = new Timer(1000 / FPSSlider.getValue(), timer.getActionListeners()[0]);
+            timer.start();
+        });
+
+        topRightPanel.add(FPSLabel);
+        topRightPanel.add(FPSSlider);
+        
+        // Strong Force Outer Radius Slider
+        JLabel strongForceOuterRadiusLabel = new JLabel("Strong Force Outer Radius = 27");
+        strongForceOuterRadiusSlider = new JSlider(10, 50, 27);
+        strongForceOuterRadiusSlider.setOrientation(SwingConstants.HORIZONTAL);
+        strongForceOuterRadiusSlider.setPreferredSize(new Dimension(300, 50));
+        strongForceOuterRadiusSlider.addChangeListener(e -> {
+            strongForceOuterRadiusLabel.setText("Strong Force Outer Radius = " + strongForceOuterRadiusSlider.getValue());
+        });
+
+        topRightPanel.add(strongForceOuterRadiusLabel);
+        topRightPanel.add(strongForceOuterRadiusSlider);
+
+        // Strong Force Inner Radius Slider
+        JLabel strongForceInnerRadiusLabel = new JLabel("Strong Force Inner Radius = 9");
+        strongForceInnerRadiusSlider = new JSlider(1, 20, 9);
+        strongForceInnerRadiusSlider.setOrientation(SwingConstants.HORIZONTAL);
+        strongForceInnerRadiusSlider.setPreferredSize(new Dimension(300, 50));
+        strongForceInnerRadiusSlider.addChangeListener(e -> {
+            strongForceInnerRadiusLabel.setText("Strong Force Inner Radius = " + strongForceInnerRadiusSlider.getValue());
+        });
+
+        topRightPanel.add(strongForceInnerRadiusLabel);
+        topRightPanel.add(strongForceInnerRadiusSlider);
+
+        // Max Speed Slider & Multiplyer
+        JLabel maxSpeedLabel = new JLabel("Max Speed = 1e7");
+        maxSpeedSlider = new JSlider(1, 9, 1);
+        JLabel maxSpeedMultLabel = new JLabel("Max Speed Multiplyer = e7");
+        maxSpeedMultSlider = new JSlider(1, 50, 7);
+
+        maxSpeedSlider.setOrientation(SwingConstants.HORIZONTAL);
+        maxSpeedSlider.setPreferredSize(new Dimension(300, 50));
+        maxSpeedMultSlider.setOrientation(SwingConstants.HORIZONTAL);
+        maxSpeedMultSlider.setPreferredSize(new Dimension(300, 50));
+    
+        maxSpeedMultSlider.addChangeListener(e -> {
+            maxSpeedMultLabel.setText("Max Speed = e" + maxSpeedMultSlider.getValue());
+            maxSpeedLabel.setText("Max Speed = " + maxSpeedSlider.getValue() + "e" + maxSpeedMultSlider.getValue());
+        });
+        maxSpeedSlider.addChangeListener(e -> {
+            maxSpeedLabel.setText("Max Speed = " + maxSpeedSlider.getValue() + "e" + maxSpeedMultSlider.getValue());
+        });
+
+        topRightPanel.add(maxSpeedLabel);
+        topRightPanel.add(maxSpeedSlider);
+        topRightPanel.add(maxSpeedMultLabel);
+        topRightPanel.add(maxSpeedMultSlider);
+
+        // Coulomb Constant Slider & Multiplier
+        JLabel kConstantLabel = new JLabel("Coulomb Constant (k) = 4e5");
+        kConstantSlider = new JSlider(1, 9, 4);
+        JLabel kConstantMultLabel = new JLabel("Coulomb Constant Multiplier = e5");
+        kConstantMultSlider = new JSlider(1, 50, 5);
+
+        kConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
+        kConstantSlider.setPreferredSize(new Dimension(300, 50));
+        kConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
+        kConstantMultSlider.setPreferredSize(new Dimension(300, 50));
+
+        kConstantMultSlider.addChangeListener(e -> {
+            kConstantMultLabel.setText("Coulomb Constant Multiplier = e" + kConstantMultSlider.getValue());
+            kConstantLabel.setText("Coulomb Constant (k) = " + kConstantSlider.getValue() + "e" + kConstantMultSlider.getValue());
+        });
+        kConstantSlider.addChangeListener(e -> {
+            kConstantLabel.setText("Coulomb Constant (k) = " + kConstantSlider.getValue() + "e" + kConstantMultSlider.getValue());
+        });
+
+        topRightPanel.add(kConstantLabel);
+        topRightPanel.add(kConstantSlider);
+        topRightPanel.add(kConstantMultLabel);
+        topRightPanel.add(kConstantMultSlider);
+
+        // Strong Force Constant Slider & Multiplier
+        JLabel strongForceConstantLabel = new JLabel("Strong Force Constant = 6e5");
+        strongForceConstantSlider = new JSlider(1, 9, 6);
+        JLabel strongForceConstantMultLabel = new JLabel("Strong Force Constant Multiplier = e5");
+        strongForceConstantMultSlider = new JSlider(1, 50, 5);
+
+        strongForceConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
+        strongForceConstantSlider.setPreferredSize(new Dimension(300, 50));
+        strongForceConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
+        strongForceConstantMultSlider.setPreferredSize(new Dimension(300, 50));
+
+        strongForceConstantMultSlider.addChangeListener(e -> {
+            strongForceConstantMultLabel.setText("Strong Force Constant Multiplier = e" + strongForceConstantMultSlider.getValue());
+            strongForceConstantLabel.setText("Strong Force Constant = " + strongForceConstantSlider.getValue() + "e" + strongForceConstantMultSlider.getValue());
+        });
+        strongForceConstantSlider.addChangeListener(e -> {
+            strongForceConstantLabel.setText("Strong Force Constant = " + strongForceConstantSlider.getValue() + "e" + strongForceConstantMultSlider.getValue());
+        });
+
+        topRightPanel.add(strongForceConstantLabel);
+        topRightPanel.add(strongForceConstantSlider);
+        topRightPanel.add(strongForceConstantMultLabel);
+        topRightPanel.add(strongForceConstantMultSlider);
+
+        // Gravity Constant Slider & Multiplier
+        JLabel gravityConstantLabel = new JLabel("Gravity Constant = 1e1");
+        gravityConstantSlider = new JSlider(1, 9, 1);
+        JLabel gravityConstantMultLabel = new JLabel("Gravity Constant Multiplier = e1");
+        gravityConstantMultSlider = new JSlider(1, 50, 2);
+
+        gravityConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
+        gravityConstantSlider.setPreferredSize(new Dimension(300, 50));
+        gravityConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
+        gravityConstantMultSlider.setPreferredSize(new Dimension(300, 50));
+
+        gravityConstantMultSlider.addChangeListener(e -> {
+            gravityConstantMultLabel.setText("Gravity Constant Multiplier = e" + gravityConstantMultSlider.getValue());
+            gravityConstantLabel.setText("Gravity Constant = " + gravityConstantSlider.getValue() + "e" + gravityConstantMultSlider.getValue());
+        });
+        gravityConstantSlider.addChangeListener(e -> {
+            gravityConstantLabel.setText("Gravity Constant = " + gravityConstantSlider.getValue() + "e" + gravityConstantMultSlider.getValue());
+        });
+
+        topRightPanel.add(gravityConstantLabel);
+        topRightPanel.add(gravityConstantSlider);
+        topRightPanel.add(gravityConstantMultLabel);
+        topRightPanel.add(gravityConstantMultSlider);
+
 
         topPanel.add(topRightPanel);
         panel.add(topPanel, BorderLayout.NORTH);
@@ -183,7 +393,7 @@ public class Main {
 
 
 
-        new Timer(16, e -> {
+        timer = new Timer(1000/FPSSlider.getValue(), e -> {
             // Reset
             for (Particle p : particles) {
                 p.resetForce();
@@ -252,7 +462,8 @@ public class Main {
             }
 
             frame.repaint();
-        }).start();
+        });
+        timer.start();
     }
 
     public static void main(String[] args) {

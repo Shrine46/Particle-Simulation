@@ -10,3 +10,5 @@ add a tail to the particles
 add sliders to adjust constants
 
 add fps slider
+
+add decay slider

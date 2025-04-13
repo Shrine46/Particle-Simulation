@@ -12,21 +12,6 @@ public class Particle {
     protected double netX;
     protected double netY;
 
-    // Constants
-    public static final double DT = 0.016 * 10; // Time step (~60 FPS)
-    protected static final double MAX_SPEED = 10000000;
-
-    // Coulomb Law
-    protected double kConstant = 400000; // Original = 8.99e9
-
-    // Strong Force
-    protected double strongForceOuterRadius = 27;
-    protected double strongForceInnerRadius = 9;
-    protected double strongForceConstant = 600000;
-
-    // Gravity
-    protected double gravityConstant = 10;
-
     public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
         this.yCor = yCor;
@@ -42,15 +27,20 @@ public class Particle {
     }
 
     public void updatePos() {
+        // may come back to this but will keep time as 60fps
+        // double time = (1.0 / Main.getFPS()) * 10;
+        double time = 0.166666666667; // mult by 10 for sim is super slow
+        double maxSpeed = Main.getMaxSpeed();
+
         double speed = Math.sqrt(xVel * xVel + yVel * yVel);
-        if (speed > MAX_SPEED) {
-            xVel *= MAX_SPEED / speed;
-            yVel *= MAX_SPEED / speed;
+        if (speed > maxSpeed) {
+            xVel *= maxSpeed / speed;
+            yVel *= maxSpeed / speed;
         }
-        xVel *= 0.90; // Drag
-        yVel *= 0.90;
-        xCor += xVel * DT;
-        yCor += yVel * DT;
+        xVel *= .90; // Drag
+        yVel *= .90;
+        xCor += xVel * time;
+        yCor += yVel * time;
 
         // Bounce off walls
         if (xCor < radius) {
@@ -71,14 +61,32 @@ public class Particle {
     }
 
     public void updateVelocity() {
+        // may come back to this but will keep time as 60fps
+        // double time = (1.0 / Main.getFPS()) * 10;
+
+        double time = 0.166666666667; // mult by 10 for sim is super slow
+
         if (this.mass == 0) return; 
         double accelX = this.netX / this.mass;
         double accelY = this.netY / this.mass;
-        this.xVel += accelX * DT;
-        this.yVel += accelY * DT;
+        this.xVel += accelX * time;
+        this.yVel += accelY * time;
     }
 
     public double[] calculateForces(Particle p2) {
+        double kConstant = Main.getCoulombConstant();
+        double strongForceOuterRadius = Main.getStrongForceOuterRadius();
+        double strongForceInnerRadius = Main.getStrongForceInnerRadius();
+        double strongForceConstant = Main.getStrongForceConstant();
+        double gravityConstant = Main.getGravityConstant();
+        // Print constants for debugging
+        // System.out.println("kConstant: " + kConstant);
+        // System.out.println("strongForceOuterRadius: " + strongForceOuterRadius);
+        // System.out.println("strongForceInnerRadius: " + strongForceInnerRadius);
+        // System.out.println("strongForceConstant: " + strongForceConstant);
+        // System.out.println("gravityConstant: " + gravityConstant);
+
+
         Particle p1 = this;
         double forceX = 0;
         double forceY = 0;
@@ -106,7 +114,7 @@ public class Particle {
 
         // Swirl effect
 
-        if (p1.isElectron() && charge2 > 0) {
+        if ((p1.isElectron() && charge2 >= 0) || (p2.isElectron() && charge1 >= 0)) {
             double combinedRadius = p1.radius + p2.radius;
             if (dist < combinedRadius + 20) {
                 double tangentialForce = coulombForce * .7; 
