@@ -114,10 +114,10 @@ public class Particle {
 
         // Swirl effect
 
-        if ((p1.isElectron() && charge2 >= 0) || (p2.isElectron() && charge1 >= 0)) {
+        if ((p1.isElectron() && charge2 > 0) || (p2.isElectron() && charge1 > 0)) {
             double combinedRadius = p1.radius + p2.radius;
             if (dist < combinedRadius + 20) {
-                double tangentialForce = coulombForce * .7; 
+                double tangentialForce = coulombForce * 1.0; 
                 double tangentX = -dirY;
                 double tangentY = dirX;
 

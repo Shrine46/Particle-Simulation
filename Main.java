@@ -301,7 +301,7 @@ public class Main {
         JLabel gravityConstantLabel = new JLabel("Gravity Constant = 1e1");
         gravityConstantSlider = new JSlider(1, 9, 1);
         JLabel gravityConstantMultLabel = new JLabel("Gravity Constant Multiplier = e1");
-        gravityConstantMultSlider = new JSlider(1, 50, 2);
+        gravityConstantMultSlider = new JSlider(1, 50, 1);
 
         gravityConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
         gravityConstantSlider.setPreferredSize(new Dimension(300, 50));
