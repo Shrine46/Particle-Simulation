@@ -3,6 +3,7 @@ import javax.swing.*;
 import java.util.ArrayList;
 import java.awt.event.*;
 import java.util.Random;
+import 
 
 public class Main {
     public static ArrayList<Particle> particles = new ArrayList<>();
@@ -442,9 +443,9 @@ public class Main {
                         double dotProduct = relativeVelX * dirX + relativeVelY * dirY;
 
                         if (dotProduct < 0) {
-                            double restitution = 0.7;
+                            double elasticity = 0.7;
 
-                            double collisionScale = (1.0 + restitution) * dotProduct / totalMass;
+                            double collisionScale = (1.0 + elasticity) * dotProduct / totalMass;
                             double impulseFactorX = collisionScale * dirX;
                             double impulseFactorY = collisionScale * dirY;
 

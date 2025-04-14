@@ -7,4 +7,6 @@ make explosion when two particles collide above a cerain speed
 
 add a tail to the particles
 
-make black hole when 
+make black hole when conditions are met
+
+I want to make a star forming simulation
