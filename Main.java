@@ -128,8 +128,6 @@ public class Main {
 
 
         // Sliders and Labels -----------------------------------------------------------------------------------------------------------------
-
-
         
         JPanel sliderPanel = new JPanel();
         sliderPanel.setLayout(new BoxLayout(sliderPanel, BoxLayout.Y_AXIS));
@@ -140,6 +138,12 @@ public class Main {
         JPanel topRightPanel = new JPanel();
         topRightPanel.setLayout(new BoxLayout(topRightPanel, BoxLayout.Y_AXIS));
         topRightPanel.setOpaque(false);
+
+        // Clear Particles
+        JButton clearParticles = new JButton("Clear Particles");
+        clearParticles.addActionListener(e -> particles.clear());
+        
+        topRightPanel.add(clearParticles);
 
 
         // Charge Slider
