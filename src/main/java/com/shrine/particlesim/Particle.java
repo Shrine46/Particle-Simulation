@@ -3,15 +3,14 @@ package com.shrine.particlesim;
 public class Particle {
     protected double xCor; // Use double for smoother motion
     protected double yCor;
-    protected double zCor;
     protected double xVel;
     protected double yVel;
     protected double zVel;
+    protected double zCor;
     protected double mass;
     protected double charge;
     protected String particleType;
     protected double radius;
-    protected Object userData; // Store visual representation
 
     // Store forces to update
     protected double netX;
@@ -34,16 +33,10 @@ public class Particle {
         else {this.radius = 3 + ((mass + charge) * .05);}
     }
 
-    // Constructor overload for backward compatibility
-    public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
-        this(xCor, yCor, 0, xVel, yVel, 0, charge, mass, particleType);
-    }
-
     public void updatePos() {
         // may come back to this but will keep time as 60fps
+        // double time = (1.0 / Main.getFPS()) * 10;
         double time = 0.166666666667; // mult by 10 for sim is super slow
-
-        // Get max speed from Main class
         double maxSpeed = Main.getMaxSpeed();
 
         double speed = Math.sqrt(xVel * xVel + yVel * yVel + zVel * zVel);
@@ -52,45 +45,34 @@ public class Particle {
             yVel *= maxSpeed / speed;
             zVel *= maxSpeed / speed;
         }
-
-        // Apply drag
-        xVel *= .90;
+        xVel *= .90; // Drag
         yVel *= .90;
-        zVel *= .90;
-
-        // Update position
         xCor += xVel * time;
         yCor += yVel * time;
         zCor += zVel * time;
 
-        // Bounce off simulation boundary (now a cube instead of walls)
-        double boundary = 400; // Size of simulation space
-        if (xCor < -boundary + radius) {
-            xCor = -boundary + radius;
+        // Bounce off walls
+        if (xCor < radius) {
+            xCor = radius;
             xVel = -xVel;
-        } else if (xCor > boundary - radius) {
-            xCor = boundary - radius;
+        } else if (xCor > 1920 - radius) {
+            xCor = 1920 - radius;
             xVel = -xVel;
         }
 
-        if (yCor < -boundary + radius) {
-            yCor = -boundary + radius;
+        if (yCor < radius) {
+            yCor = radius;
             yVel = -yVel;
-        } else if (yCor > boundary - radius) {
-            yCor = boundary - radius;
+        } else if (yCor > 1080 - radius) {
+            yCor = 1080 - radius;
             yVel = -yVel;
-        }
-
-        if (zCor < -boundary + radius) {
-            zCor = -boundary + radius;
-            zVel = -zVel;
-        } else if (zCor > boundary - radius) {
-            zCor = boundary - radius;
-            zVel = -zVel;
         }
     }
 
     public void updateVelocity() {
+        // may come back to this but will keep time as 60fps
+        // double time = (1.0 / Main.getFPS()) * 10;
+
         double time = 0.166666666667; // mult by 10 for sim is super slow
 
         if (this.mass == 0) return;
@@ -103,7 +85,6 @@ public class Particle {
     }
 
     public double[] calculateForces(Particle p2) {
-        // Get constants from Main class
         double kConstant = Main.getCoulombConstant();
         double strongForceOuterRadius = Main.getStrongForceOuterRadius();
         double strongForceInnerRadius = Main.getStrongForceInnerRadius();
@@ -134,7 +115,7 @@ public class Particle {
         double charge1 = p1.getCharge();
         double charge2 = p2.getCharge();
 
-        // Coulomb Force
+        // Culomb Force
         double coulombForce = (kConstant * charge1 * charge2) / distsq;
         forceX -= coulombForce * dirX;
         forceY -= coulombForce * dirY;
@@ -172,6 +153,8 @@ public class Particle {
                 }
             }
         }
+
+
 
         // Strong Force
         if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {
@@ -242,14 +225,6 @@ public class Particle {
         this.yCor = yCor;
     }
 
-    public double getzCor() {
-        return zCor;
-    }
-
-    public void setzCor(double zCor) {
-        this.zCor = zCor;
-    }
-
     public double getxVel() {
         return xVel;
     }
@@ -264,14 +239,6 @@ public class Particle {
 
     public void setyVel(double yVel) {
         this.yVel = yVel;
-    }
-
-    public double getzVel() {
-        return zVel;
-    }
-
-    public void setzVel(double zVel) {
-        this.zVel = zVel;
     }
 
     public double getMass() {
@@ -296,6 +263,21 @@ public class Particle {
 
     public void setParticleType(String particleType) {
         this.particleType = particleType;
+    }
+    public double getzVel() {
+        return zVel;
+    }
+
+    public void setzVel(double zVel) {
+        this.zVel = zVel;
+    }
+
+    public double getzCor() {
+        return zCor;
+    }
+
+    public void setzCor(double zCor) {
+        this.zCor = zCor;
     }
 
     public double getRadius() {
@@ -328,13 +310,5 @@ public class Particle {
 
     public void setNetZ(double netZ) {
         this.netZ = netZ;
-    }
-
-    public Object getUserData() {
-        return userData;
-    }
-
-    public void setUserData(Object userData) {
-        this.userData = userData;
     }
 }
