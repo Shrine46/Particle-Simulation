@@ -1,513 +1,584 @@
 package com.shrine.particlesim;
 
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
 import javafx.scene.Group;
 import javafx.scene.PerspectiveCamera;
 import javafx.scene.Scene;
-import javafx.stage.Stage;
-import javafx.scene.shape.*;
+import javafx.scene.SubScene;
 import javafx.scene.control.*;
-import javafx.geometry.Insets;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
-import javafx.scene.paint.*;
-import javafx.scene.transform.*;
-import javafx.scene.input.*;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.PhongMaterial;
+import javafx.scene.shape.Sphere;
+import javafx.stage.Stage;
+import javafx.util.StringConverter;
 
-//import java.awt.*;
-import javax.swing.*;
 import java.util.ArrayList;
-import java.awt.event.*;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Main extends Application {
-    public static ArrayList<Particle> particles = new ArrayList<>();
-    private static JFrame frame;
-    private static JPanel panel;
-    private static ThreadLocalRandom rand;
-    private static Timer timer;
+    // Lists and collections
+    private ArrayList<Particle> particles = new ArrayList<>();
+    private Group particleGroup = new Group();
 
-    // Slider Values
-    private static JSlider maxSpeedSlider;
-    private static JSlider maxSpeedMultSlider;
-    private static JSlider strongForceInnerRadiusSlider;
-    private static JSlider FPSSlider;
-    private static JSlider strongForceOuterRadiusSlider;
-    private static JSlider kConstantSlider;
-    private static JSlider kConstantMultSlider;
-    private static JSlider strongForceConstantSlider;
-    private static JSlider strongForceConstantMultSlider;
-    private static JSlider gravityConstantSlider;
-    private static JSlider gravityConstantMultSlider;
+    // 3D scene components
+    private SubScene simulationSpace;
+    private Group root3D;
+    private PerspectiveCamera camera;
 
+    // Camera control variables
+    private double mouseOldX, mouseOldY;
+    private double mousePosX, mousePosY;
+    private final double cameraDistance = 1000;
+    private double cameraXAngle = 0;
+    private double cameraYAngle = 0;
+
+    // Random generator
+    private static Random rand = new Random();
+
+    // Animation
+    private AnimationTimer timer;
+
+    // Simulation constants
     // Electron
     protected static final double electronCharge = -1; // Original = -1.6-19
     protected static final double electronMass = 10; // Original = 9.109e-31
     // Proton
     protected static final double protonCharge = 1; // Original = 1.6e-19
     protected static final double protonMass = 100; // Original = 1.67262158e-29
-
     // Neutron
     protected static final double neutronCharge = 0;
     protected static final double neutronMass = 100; // Original = 1.67492749804e-29
 
-    public static double getMaxSpeed() {
-        if (maxSpeedSlider == null || maxSpeedMultSlider == null) {
-            return 1e7; // Default max speed
-        }
-        return maxSpeedSlider.getValue() * Math.pow(10, maxSpeedMultSlider.getValue());
-    }
+    // Simulation parameters with default values
+    private static double maxSpeed = 1e7;
+    private static double strongForceOuterRadius = 27;
+    private static double strongForceInnerRadius = 9;
+    private static double coulombConstant = 4e5;
+    private static double strongForceConstant = 6e5;
+    private static double gravityConstant = 1e1;
 
-    public static double getStrongForceOuterRadius() {
-        if (strongForceOuterRadiusSlider == null) {
-            return 27; // Default strong force outer radius
-        }
-        return strongForceOuterRadiusSlider.getValue();
-    }
+    // UI controls
+    private Slider chargeSlider;
+    private Slider massSlider;
+    private Slider decaySlider;
 
-    public static double getStrongForceInnerRadius() {
-        if (strongForceInnerRadiusSlider == null) {
-            return 9; // Default strong force inner radius
-        }
-        return strongForceInnerRadiusSlider.getValue();
-    }
-
-    public static int getFPS() {
-        if (FPSSlider == null) {
-            return 60; // Default FPS
-        }
-        return FPSSlider.getValue();
-    }
-
-    public static double getCoulombConstant() {
-        if (kConstantSlider == null || kConstantMultSlider == null) {
-            return 4e5; // Default Coulomb constant
-        }
-        return kConstantSlider.getValue() * Math.pow(10, kConstantMultSlider.getValue());
-    }
-
-    public static double getStrongForceConstant() {
-        if (strongForceConstantSlider == null || strongForceConstantMultSlider == null) {
-            return 6e5; // Default strong force constant
-        }
-        return strongForceConstantSlider.getValue() * Math.pow(10, strongForceConstantMultSlider.getValue());
-    }
-
-    public static double getGravityConstant() {
-        if (gravityConstantSlider == null || gravityConstantMultSlider == null) {
-            return 1e1; // Default gravity constant
-        }
-        return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
-    }
-
-
-
-
+    @Override
     public void start(Stage primaryStage) {
-        Sphere innerSphere = new Sphere(100);
-        PhongMaterial sphereMaterial = new PhongMaterial();
-        sphereMaterial.setDiffuseColor(Color.LIGHTBLUE);
-        innerSphere.setMaterial(sphereMaterial);
-        Group root = new Group(innerSphere);
+        // Set up the 3D environment
+        setupScene(primaryStage);
 
-        Scene scene = new Scene(root, 800, 600);
-        primaryStage.setTitle("My JavaFX App");
-        primaryStage.setScene(scene);
+        // Set up UI controls
+        setupControls(primaryStage);
+
+        // Set up the animation loop
+        setupAnimationLoop();
+
+        // Display the stage
         primaryStage.show();
-
-        // Camera
-        PerspectiveCamera camera = new PerspectiveCamera(true);
-        camera.setTranslateZ(-1000);
-        scene.setCamera(camera);
-
-
     }
 
+    private void setupScene(Stage primaryStage) {
+        // Create main BorderPane layout
+        BorderPane mainLayout = new BorderPane();
 
-    public static void main(String[] args) {
-        launch(args);
+        // Create 3D content
+        root3D = new Group();
+
+        // Add a simple sphere as a reference point
+        Sphere referenceSphere = new Sphere(5);
+        PhongMaterial material = new PhongMaterial();
+        material.setDiffuseColor(Color.GRAY);
+        referenceSphere.setMaterial(material);
+        root3D.getChildren().add(referenceSphere);
+
+        // Add particle group to root
+        root3D.getChildren().add(particleGroup);
+
+        // Create camera
+        camera = new PerspectiveCamera(true);
+        camera.setNearClip(0.1);
+        camera.setFarClip(10000.0);
+        camera.setTranslateZ(-cameraDistance);
+
+        // Create the 3D subscene
+        simulationSpace = new SubScene(root3D, 800, 600, true, javafx.scene.SceneAntialiasing.BALANCED);
+        simulationSpace.setFill(Color.BLACK);
+        simulationSpace.setCamera(camera);
+
+        // Set up camera rotation with mouse
+        setupCameraControls();
+
+        // Add simulation space to the center of the layout
+        mainLayout.setCenter(simulationSpace);
+
+        // Create the main scene
+        Scene scene = new Scene(mainLayout, 1200, 800);
+
+        // Add key bindings for particle creation
+        setupKeyBindings(scene);
+
+        // Configure the primary stage
+        primaryStage.setTitle("3D Particle Simulation");
+        primaryStage.setScene(scene);
     }
 
+    private void setupCameraControls() {
+        simulationSpace.setOnMousePressed(event -> {
+            mouseOldX = event.getSceneX();
+            mouseOldY = event.getSceneY();
+        });
 
-    public static void display() {
-        frame = new JFrame("Particle Playground");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1920, 1080);
+        simulationSpace.setOnMouseDragged(event -> {
+            mousePosX = event.getSceneX();
+            mousePosY = event.getSceneY();
 
-        rand = ThreadLocalRandom.current();
+            double deltaX = (mousePosX - mouseOldX);
+            double deltaY = (mousePosY - mouseOldY);
 
+            // Explicitly check for primary (left) button
+            if (event.isPrimaryButtonDown()) {
+                // Rotate camera
+                cameraXAngle -= deltaY * 0.1;
+                cameraYAngle += deltaX * 0.1;
 
+                updateCameraPosition();
+            }
 
-        // Drawing Particles -----------------------------------------------------------------------------------------------------------------
+            mouseOldX = mousePosX;
+            mouseOldY = mousePosY;
+        });
 
+        simulationSpace.setOnScroll(event -> {
+            // Zoom camera
+            double delta = event.getDeltaY() * 5;
+            camera.setTranslateZ(camera.getTranslateZ() + delta);
+        });
+    }
 
+    private void updateCameraPosition() {
+        // Limit vertical rotation
+        cameraXAngle = Math.max(-85, Math.min(85, cameraXAngle));
 
-        panel = new JPanel() {
+        // Convert spherical to Cartesian coordinates
+        double radXAngle = Math.toRadians(cameraXAngle);
+        double radYAngle = Math.toRadians(cameraYAngle);
+
+        double x = cameraDistance * Math.cos(radXAngle) * Math.sin(radYAngle);
+        double y = cameraDistance * Math.sin(radXAngle);
+        double z = cameraDistance * Math.cos(radXAngle) * Math.cos(radYAngle);
+
+        // Update camera position
+        camera.setTranslateX(x);
+        camera.setTranslateY(y);
+        camera.setTranslateZ(z);
+
+        // Create a Transform to point the camera at the origin
+        lookAtOrigin();
+    }
+
+    private void lookAtOrigin() {
+        // Get the camera's position
+        double x = camera.getTranslateX();
+        double y = camera.getTranslateY();
+        double z = camera.getTranslateZ();
+
+        // Calculate the direction to the origin
+        double dirX = -x;
+        double dirY = -y;
+        double dirZ = -z;
+
+        // Normalize the direction
+        double length = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+        dirX /= length;
+        dirY /= length;
+        dirZ /= length;
+
+        // Calculate the rotation around Y axis (yaw)
+        double yaw = Math.toDegrees(Math.atan2(dirX, dirZ));
+
+        // Calculate the rotation around X axis (pitch)
+        double pitch = Math.toDegrees(Math.asin(-dirY));
+
+        // Apply rotations - JavaFX camera needs to be oriented correctly
+        camera.setRotate(0); // Reset rotation
+        camera.setRotationAxis(javafx.scene.transform.Rotate.Y_AXIS);
+        camera.setRotate(yaw);
+
+        // Create a rotate transform for pitch
+        javafx.scene.transform.Rotate pitchRotate =
+                new javafx.scene.transform.Rotate(pitch, javafx.scene.transform.Rotate.X_AXIS);
+
+        // Apply the transforms
+        camera.getTransforms().clear();
+        camera.getTransforms().add(pitchRotate);
+    }
+
+    private void setupControls(Stage primaryStage) {
+        VBox controlPanel = new VBox(10);
+        controlPanel.setPadding(new Insets(10));
+        controlPanel.setStyle("-fx-background-color: #f0f0f0;");
+
+        // Add clear particles button
+        Button clearButton = new Button("Clear Particles");
+        clearButton.setOnAction(e -> {
+            particles.clear();
+            particleGroup.getChildren().clear();
+        });
+        controlPanel.getChildren().add(clearButton);
+
+        // Add particle property sliders
+        chargeSlider = createSlider("Charge", -100, 100, 0);
+        massSlider = createSlider("Mass", 1, 2000, 1);
+        decaySlider = createSlider("Decay Speed", 0, 100, 0);
+
+        controlPanel.getChildren().addAll(
+                new Label("Particle Properties:"),
+                chargeSlider,
+                massSlider,
+                decaySlider
+        );
+
+        // Create physics parameter sliders
+        Slider fpsSlider = createSlider("FPS", 1, 120, 60);
+        fpsSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            // FPS changes handled in animation timer
+        });
+
+        Slider strongForceOuterRadiusSlider = createSlider("Strong Force Outer Radius", 10, 50, 27);
+        strongForceOuterRadiusSlider.valueProperty().addListener((obs, oldVal, newVal) ->
+                strongForceOuterRadius = newVal.doubleValue());
+
+        Slider strongForceInnerRadiusSlider = createSlider("Strong Force Inner Radius", 1, 20, 9);
+        strongForceInnerRadiusSlider.valueProperty().addListener((obs, oldVal, newVal) ->
+                strongForceInnerRadius = newVal.doubleValue());
+
+        // Create exponential sliders for constants
+        HBox maxSpeedBox = createExponentialSlider("Max Speed", 1, 9, 1, 1, 50, 7,
+                (base, exp) -> maxSpeed = base * Math.pow(10, exp));
+
+        HBox coulombBox = createExponentialSlider("Coulomb Constant", 1, 9, 4, 1, 50, 5,
+                (base, exp) -> coulombConstant = base * Math.pow(10, exp));
+
+        HBox strongForceBox = createExponentialSlider("Strong Force Constant", 1, 9, 6, 1, 50, 5,
+                (base, exp) -> strongForceConstant = base * Math.pow(10, exp));
+
+        HBox gravityBox = createExponentialSlider("Gravity Constant", 1, 9, 1, 1, 50, 1,
+                (base, exp) -> gravityConstant = base * Math.pow(10, exp));
+
+        controlPanel.getChildren().addAll(
+                new Separator(),
+                new Label("Physics Parameters:"),
+                fpsSlider,
+                strongForceOuterRadiusSlider,
+                strongForceInnerRadiusSlider,
+                maxSpeedBox,
+                coulombBox,
+                strongForceBox,
+                gravityBox
+        );
+
+        // Add scroll pane for controls
+        ScrollPane scrollPane = new ScrollPane(controlPanel);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefWidth(300);
+
+        // Add to main layout
+        BorderPane mainLayout = (BorderPane) ((Scene) primaryStage.getScene()).getRoot();
+        mainLayout.setRight(scrollPane);
+
+        // Make 3D scene resize with window
+        simulationSpace.widthProperty().bind(
+                mainLayout.widthProperty().subtract(scrollPane.getPrefWidth()));
+        simulationSpace.heightProperty().bind(mainLayout.heightProperty());
+    }
+
+    private Slider createSlider(String name, double min, double max, double defaultValue) {
+        Label label = new Label(name + ": " + defaultValue);
+        Slider slider = new Slider(min, max, defaultValue);
+        slider.setShowTickMarks(true);
+        slider.setShowTickLabels(true);
+
+        slider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            label.setText(name + ": " + Math.round(newVal.doubleValue() * 100) / 100.0);
+        });
+
+        VBox sliderBox = new VBox(5, label, slider);
+
+        return slider;
+    }
+
+    private HBox createExponentialSlider(
+            String name,
+            double baseMin, double baseMax, double baseDefault,
+            double expMin, double expMax, double expDefault,
+            ExponentialValueListener listener) {
+
+        VBox container = new VBox(5);
+
+        Label titleLabel = new Label(name + ": " + baseDefault + "e" + expDefault);
+
+        Slider baseSlider = new Slider(baseMin, baseMax, baseDefault);
+        baseSlider.setShowTickMarks(true);
+        baseSlider.setShowTickLabels(true);
+        baseSlider.setMajorTickUnit((baseMax - baseMin) / 8);
+
+        Slider expSlider = new Slider(expMin, expMax, expDefault);
+        expSlider.setShowTickMarks(true);
+        expSlider.setShowTickLabels(true);
+        expSlider.setMajorTickUnit((expMax - expMin) / 10);
+
+        Label baseLabel = new Label("Base: " + baseDefault);
+        Label expLabel = new Label("Exponent: e" + expDefault);
+
+        baseSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            double base = Math.round(newVal.doubleValue() * 10) / 10.0;
+            double exp = expSlider.getValue();
+            baseLabel.setText("Base: " + base);
+            titleLabel.setText(name + ": " + base + "e" + exp);
+            listener.onValueChanged(base, exp);
+        });
+
+        expSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            double base = baseSlider.getValue();
+            double exp = newVal.intValue();
+            expLabel.setText("Exponent: e" + exp);
+            titleLabel.setText(name + ": " + base + "e" + exp);
+            listener.onValueChanged(base, exp);
+        });
+
+        container.getChildren().addAll(
+                titleLabel,
+                new HBox(5, new Label("Base:"), baseSlider),
+                new HBox(5, new Label("Exponent:"), expSlider)
+        );
+
+        return new HBox(container);
+    }
+
+    private interface ExponentialValueListener {
+        void onValueChanged(double base, double exponent);
+    }
+
+    private void setupKeyBindings(Scene scene) {
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.E) {
+                createParticle("electron", electronCharge, electronMass);
+            } else if (event.getCode() == KeyCode.P) {
+                createParticle("proton", protonCharge, protonMass);
+            } else if (event.getCode() == KeyCode.N) {
+                createParticle("neutron", neutronCharge, neutronMass);
+            }
+        });
+
+        simulationSpace.setOnMouseClicked(event -> {
+            // Only create particles with right mouse button
+            if (event.isSecondaryButtonDown() && chargeSlider != null && massSlider != null) {
+                double charge = chargeSlider.getValue();
+                double mass = massSlider.getValue();
+                createParticleAtMousePosition(event, "custom", charge, mass);
+            }
+        });
+    }
+
+    private void createParticle(String type, double charge, double mass) {
+        // Create particle at random position
+        double x = rand.nextDouble() * 400 - 200;
+        double y = rand.nextDouble() * 400 - 200;
+        double z = rand.nextDouble() * 400 - 200;
+
+        double vx = rand.nextDouble() * 8 - 4;
+        double vy = rand.nextDouble() * 8 - 4;
+        double vz = rand.nextDouble() * 8 - 4;
+
+        Particle particle = new Particle(x, y, z, vx, vy, vz, charge, mass, type);
+        particles.add(particle);
+
+        // Create 3D representation
+        addParticleToScene(particle);
+    }
+
+    private void createParticleAtMousePosition(MouseEvent event, String type, double charge, double mass) {
+        // Get 3D coordinates from mouse click (simplified)
+        double x = (event.getX() - simulationSpace.getWidth() / 2) * 0.5;
+        double y = (event.getY() - simulationSpace.getHeight() / 2) * 0.5;
+        double z = 0; // Default z position
+
+        // Random velocity
+        double vx = rand.nextDouble() * 8 - 4;
+        double vy = rand.nextDouble() * 8 - 4;
+        double vz = rand.nextDouble() * 8 - 4;
+
+        Particle particle = new Particle(x, y, z, vx, vy, vz, charge, mass, type);
+        particles.add(particle);
+
+        // Create 3D representation
+        addParticleToScene(particle);
+    }
+
+    private void addParticleToScene(Particle particle) {
+        Sphere sphere = new Sphere(particle.getRadius());
+
+        // Set color based on particle type
+        PhongMaterial material = new PhongMaterial();
+        if (particle.getCharge() == 0) {
+            material.setDiffuseColor(Color.GRAY); // Neutron
+        } else if (particle.getCharge() > 0) {
+            material.setDiffuseColor(Color.RED); // Positive charge
+        } else {
+            material.setDiffuseColor(Color.BLUE); // Negative charge
+        }
+        sphere.setMaterial(material);
+
+        // Set initial position
+        sphere.setTranslateX(particle.getxCor());
+        sphere.setTranslateY(particle.getyCor());
+        sphere.setTranslateZ(particle.getzCor());
+
+        // Store reference to the sphere in the particle's userData
+        particle.setUserData(sphere);
+
+        // Add to scene
+        particleGroup.getChildren().add(sphere);
+    }
+
+    private void setupAnimationLoop() {
+        timer = new AnimationTimer() {
+            private long lastUpdate = 0;
+
             @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2d = (Graphics2D) g;
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                for (Particle p : particles) {
-                    if (p.getCharge() == 0) {
-                        g2d.setColor(Color.GRAY);
-                    } else if (p.getCharge() > 0) {
-                        g2d.setColor(Color.RED); // Positive charge
-                    } else {
-                        g2d.setColor(Color.BLUE); // Negative charge
-                    }
-                    int diameter = (int) (p.radius * 2);
-                    int topLeftX = (int) (p.getxCor() - p.radius);
-                    int topLeftY = (int) (p.getyCor() - p.radius);
-
-                    g2d.fillOval(topLeftX, topLeftY, diameter, diameter);
+            public void handle(long now) {
+                // Control frame rate (approx 60 FPS)
+                if (lastUpdate == 0 || now - lastUpdate >= 16_666_666) { // ~60 FPS in nanoseconds
+                    updateParticles();
+                    lastUpdate = now;
                 }
             }
         };
-        panel.setBackground(Color.LIGHT_GRAY);
-        panel.setFocusable(true);
-
-        // Sliders and Labels -----------------------------------------------------------------------------------------------------------------
-
-        JPanel sliderPanel = new JPanel();
-        sliderPanel.setLayout(new BoxLayout(sliderPanel, BoxLayout.Y_AXIS));
-
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        topPanel.setOpaque(false);
-
-        JPanel topRightPanel = new JPanel();
-        topRightPanel.setLayout(new BoxLayout(topRightPanel, BoxLayout.Y_AXIS));
-        topRightPanel.setOpaque(false);
-
-        // Clear Particles
-        JButton clearParticles = new JButton("Clear Particles");
-        clearParticles.addActionListener(e -> particles.clear());
-
-        topRightPanel.add(clearParticles);
-
-
-        // Charge Slider
-        JLabel chargeLabel = new JLabel("Charge = 0");
-        JSlider chargeSlider = new JSlider(-100, 100, 0);
-        chargeSlider.setOrientation(SwingConstants.HORIZONTAL);
-        chargeSlider.setPreferredSize(new Dimension(300, 50));
-        panel.setLayout(new BorderLayout());
-
-        chargeSlider.addChangeListener(e -> {
-            String str = ("Charge = " +chargeSlider.getValue());
-            chargeLabel.setText(str);
-        });
-
-        topRightPanel.add(chargeLabel);
-        topRightPanel.add(chargeSlider);
-
-        // Mass Slider
-        JLabel massLabel = new JLabel("1");
-        JSlider massSlider = new JSlider(1, 2000, 1);
-
-        massSlider.setOrientation(SwingConstants.HORIZONTAL);
-        massSlider.setPreferredSize(new Dimension(300, 50));
-        massSlider.addChangeListener(e -> {
-            String str = "Mass = " + massSlider.getValue() * 1;
-            massLabel.setText(str);
-        });
-
-        topRightPanel.add(massLabel);
-        topRightPanel.add(massSlider);
-
-        // Decay Slider
-        JLabel decayLabel = new JLabel("Decay Speed = 0");
-        JSlider decaySlider = new JSlider(0, 100, 0);
-        decaySlider.setOrientation(SwingConstants.HORIZONTAL);
-        decaySlider.setPreferredSize(new Dimension(300, 50));
-        decaySlider.addChangeListener(e -> {
-            String str = "Decay Speed = " + decaySlider.getValue();
-            decayLabel.setText(str);
-        });
-
-        topRightPanel.add(decayLabel);
-        topRightPanel.add(decaySlider);
-
-        // FPS Slider
-        JLabel FPSLabel = new JLabel("FPS = " + 60);
-        FPSSlider = new JSlider(1, 540, 60);
-        FPSSlider.setOrientation(SwingConstants.HORIZONTAL);
-        FPSSlider.setPreferredSize(new Dimension(300, 50));
-        FPSSlider.addChangeListener(e -> {
-            FPSLabel.setText("FPS = " + FPSSlider.getValue());
-
-            timer.stop();
-
-            timer = new Timer(1000 / FPSSlider.getValue(), timer.getActionListeners()[0]);
-            timer.start();
-        });
-
-        topRightPanel.add(FPSLabel);
-        topRightPanel.add(FPSSlider);
-
-        // Strong Force Outer Radius Slider
-        JLabel strongForceOuterRadiusLabel = new JLabel("Strong Force Outer Radius = 27");
-        strongForceOuterRadiusSlider = new JSlider(10, 50, 27);
-        strongForceOuterRadiusSlider.setOrientation(SwingConstants.HORIZONTAL);
-        strongForceOuterRadiusSlider.setPreferredSize(new Dimension(300, 50));
-        strongForceOuterRadiusSlider.addChangeListener(e -> {
-            strongForceOuterRadiusLabel.setText("Strong Force Outer Radius = " + strongForceOuterRadiusSlider.getValue());
-        });
-
-        topRightPanel.add(strongForceOuterRadiusLabel);
-        topRightPanel.add(strongForceOuterRadiusSlider);
-
-        // Strong Force Inner Radius Slider
-        JLabel strongForceInnerRadiusLabel = new JLabel("Strong Force Inner Radius = 9");
-        strongForceInnerRadiusSlider = new JSlider(1, 20, 9);
-        strongForceInnerRadiusSlider.setOrientation(SwingConstants.HORIZONTAL);
-        strongForceInnerRadiusSlider.setPreferredSize(new Dimension(300, 50));
-        strongForceInnerRadiusSlider.addChangeListener(e -> {
-            strongForceInnerRadiusLabel.setText("Strong Force Inner Radius = " + strongForceInnerRadiusSlider.getValue());
-        });
-
-        topRightPanel.add(strongForceInnerRadiusLabel);
-        topRightPanel.add(strongForceInnerRadiusSlider);
-
-        // Max Speed Slider & Multiplyer
-        JLabel maxSpeedLabel = new JLabel("Max Speed = 1e7");
-        maxSpeedSlider = new JSlider(1, 9, 1);
-        JLabel maxSpeedMultLabel = new JLabel("Max Speed Multiplyer = e7");
-        maxSpeedMultSlider = new JSlider(1, 50, 7);
-
-        maxSpeedSlider.setOrientation(SwingConstants.HORIZONTAL);
-        maxSpeedSlider.setPreferredSize(new Dimension(300, 50));
-        maxSpeedMultSlider.setOrientation(SwingConstants.HORIZONTAL);
-        maxSpeedMultSlider.setPreferredSize(new Dimension(300, 50));
-
-        maxSpeedMultSlider.addChangeListener(e -> {
-            maxSpeedMultLabel.setText("Max Speed = e" + maxSpeedMultSlider.getValue());
-            maxSpeedLabel.setText("Max Speed = " + maxSpeedSlider.getValue() + "e" + maxSpeedMultSlider.getValue());
-        });
-        maxSpeedSlider.addChangeListener(e -> {
-            maxSpeedLabel.setText("Max Speed = " + maxSpeedSlider.getValue() + "e" + maxSpeedMultSlider.getValue());
-        });
-
-        topRightPanel.add(maxSpeedLabel);
-        topRightPanel.add(maxSpeedSlider);
-        topRightPanel.add(maxSpeedMultLabel);
-        topRightPanel.add(maxSpeedMultSlider);
-
-        // Coulomb Constant Slider & Multiplier
-        JLabel kConstantLabel = new JLabel("Coulomb Constant (k) = 4e5");
-        kConstantSlider = new JSlider(1, 9, 4);
-        JLabel kConstantMultLabel = new JLabel("Coulomb Constant Multiplier = e5");
-        kConstantMultSlider = new JSlider(1, 50, 5);
-
-        kConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
-        kConstantSlider.setPreferredSize(new Dimension(300, 50));
-        kConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
-        kConstantMultSlider.setPreferredSize(new Dimension(300, 50));
-
-        kConstantMultSlider.addChangeListener(e -> {
-            kConstantMultLabel.setText("Coulomb Constant Multiplier = e" + kConstantMultSlider.getValue());
-            kConstantLabel.setText("Coulomb Constant (k) = " + kConstantSlider.getValue() + "e" + kConstantMultSlider.getValue());
-        });
-        kConstantSlider.addChangeListener(e -> {
-            kConstantLabel.setText("Coulomb Constant (k) = " + kConstantSlider.getValue() + "e" + kConstantMultSlider.getValue());
-        });
-
-        topRightPanel.add(kConstantLabel);
-        topRightPanel.add(kConstantSlider);
-        topRightPanel.add(kConstantMultLabel);
-        topRightPanel.add(kConstantMultSlider);
-
-        // Strong Force Constant Slider & Multiplier
-        JLabel strongForceConstantLabel = new JLabel("Strong Force Constant = 6e5");
-        strongForceConstantSlider = new JSlider(1, 9, 6);
-        JLabel strongForceConstantMultLabel = new JLabel("Strong Force Constant Multiplier = e5");
-        strongForceConstantMultSlider = new JSlider(1, 50, 5);
-
-        strongForceConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
-        strongForceConstantSlider.setPreferredSize(new Dimension(300, 50));
-        strongForceConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
-        strongForceConstantMultSlider.setPreferredSize(new Dimension(300, 50));
-
-        strongForceConstantMultSlider.addChangeListener(e -> {
-            strongForceConstantMultLabel.setText("Strong Force Constant Multiplier = e" + strongForceConstantMultSlider.getValue());
-            strongForceConstantLabel.setText("Strong Force Constant = " + strongForceConstantSlider.getValue() + "e" + strongForceConstantMultSlider.getValue());
-        });
-        strongForceConstantSlider.addChangeListener(e -> {
-            strongForceConstantLabel.setText("Strong Force Constant = " + strongForceConstantSlider.getValue() + "e" + strongForceConstantMultSlider.getValue());
-        });
-
-        topRightPanel.add(strongForceConstantLabel);
-        topRightPanel.add(strongForceConstantSlider);
-        topRightPanel.add(strongForceConstantMultLabel);
-        topRightPanel.add(strongForceConstantMultSlider);
-
-        // Gravity Constant Slider & Multiplier
-        JLabel gravityConstantLabel = new JLabel("Gravity Constant = 1e1");
-        gravityConstantSlider = new JSlider(1, 9, 1);
-        JLabel gravityConstantMultLabel = new JLabel("Gravity Constant Multiplier = e1");
-        gravityConstantMultSlider = new JSlider(1, 50, 1);
-
-        gravityConstantSlider.setOrientation(SwingConstants.HORIZONTAL);
-        gravityConstantSlider.setPreferredSize(new Dimension(300, 50));
-        gravityConstantMultSlider.setOrientation(SwingConstants.HORIZONTAL);
-        gravityConstantMultSlider.setPreferredSize(new Dimension(300, 50));
-
-        gravityConstantMultSlider.addChangeListener(e -> {
-            gravityConstantMultLabel.setText("Gravity Constant Multiplier = e" + gravityConstantMultSlider.getValue());
-            gravityConstantLabel.setText("Gravity Constant = " + gravityConstantSlider.getValue() + "e" + gravityConstantMultSlider.getValue());
-        });
-        gravityConstantSlider.addChangeListener(e -> {
-            gravityConstantLabel.setText("Gravity Constant = " + gravityConstantSlider.getValue() + "e" + gravityConstantMultSlider.getValue());
-        });
-
-        topRightPanel.add(gravityConstantLabel);
-        topRightPanel.add(gravityConstantSlider);
-        topRightPanel.add(gravityConstantMultLabel);
-        topRightPanel.add(gravityConstantMultSlider);
-
-
-        topPanel.add(topRightPanel);
-        panel.add(topPanel, BorderLayout.NORTH);
-
-
-
-        // Key bindings -----------------------------------------------------------------------------------------------------------------
-
-
-
-        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, 0), "spawnElectron");
-        panel.getActionMap().put("spawnElectron", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Point p = MouseInfo.getPointerInfo().getLocation();
-                SwingUtilities.convertPointFromScreen(p, panel);
-                double offsetX = rand.nextDouble(-5, 5);
-                double offsetY = rand.nextDouble(-5, 5);
-                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), electronCharge, electronMass, "electron");
-                particles.add(electron);
-            }
-        });
-
-        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), "spawnProton");
-        panel.getActionMap().put("spawnProton", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Point p = MouseInfo.getPointerInfo().getLocation();
-                SwingUtilities.convertPointFromScreen(p, panel);
-                double offsetX = rand.nextDouble(-5, 5);
-                double offsetY = rand.nextDouble(-5, 5);
-                Particle proton = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), protonCharge, protonMass, "proton");
-                particles.add(proton);
-            }
-        });
-
-        panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_N, 0), "spawnNeutron");
-        panel.getActionMap().put("spawnNeutron", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Point p = MouseInfo.getPointerInfo().getLocation();
-                SwingUtilities.convertPointFromScreen(p, panel);
-                double offsetX = rand.nextDouble(-5, 5);
-                double offsetY = rand.nextDouble(-5, 5);
-                Particle neutron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), neutronCharge, neutronMass, "neutron");
-                particles.add(neutron);
-            }
-        });
-
-        panel.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                panel.requestFocusInWindow();
-                Point p = MouseInfo.getPointerInfo().getLocation();
-                SwingUtilities.convertPointFromScreen(p, panel);
-                double offsetX = rand.nextDouble(-5, 5);
-                double offsetY = rand.nextDouble(-5, 5);
-                Particle chargedParticle = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), chargeSlider.getValue(), massSlider.getValue(), "chargeParticle"); // Original = -1.6-19 AND 1.67262158e-27
-                particles.add(chargedParticle);
-            }
-        });
-
-        frame.add(panel);
-        frame.setVisible(true);
-        SwingUtilities.invokeLater(() -> panel.requestFocusInWindow());
-
-
-
-        // Main Loop ---------------------------------------------------------------------------------------------------
-
-
-
-        timer = new Timer(1000/FPSSlider.getValue(), e -> {
-            // Reset
-            for (Particle p : particles) {
-                p.resetForce();
-            }
-
-            for (int i = 0; i < particles.size(); i++) {
-                for (int j = i + 1; j < particles.size(); j++) {
-                    Particle p1 = particles.get(i);
-                    Particle p2 = particles.get(j);
-
-                    double[] forceOnP1 = p1.calculateForces(p2);
-                    p1.addForce(forceOnP1[0], forceOnP1[1], forceOnP1[2]);
-                    p2.addForce(-forceOnP1[0], -forceOnP1[1], -forceOnP1[2]);
-
-                    double distX = p2.xCor - p1.xCor;
-                    double distY = p2.yCor - p1.yCor;
-                    double distSq = distX * distX + distY * distY;
-
-                    double collisionRadiusSum = p1.radius + p2.radius;
-                    double collisionRadiusSumSq = collisionRadiusSum * collisionRadiusSum;
-
-                    if (distSq < collisionRadiusSumSq && distSq > 1e-9) {
-                        double dist = Math.sqrt(distSq);
-
-                        double overlap = collisionRadiusSum - dist;
-                        double dirX = distX / dist;
-                        double dirY = distY / dist;
-
-                        double totalMass = p1.mass + p2.mass;
-                        double pushFactor1 = (p2.mass / totalMass) * overlap;
-                        double pushFactor2 = (p1.mass / totalMass) * overlap;
-
-                        p1.xCor -= dirX * pushFactor1;
-                        p1.yCor -= dirY * pushFactor1;
-                        p2.xCor += dirX * pushFactor2;
-                        p2.yCor += dirY * pushFactor2;
-
-
-                        double relativeVelX = p2.xVel - p1.xVel;
-                        double relativeVelY = p2.yVel - p1.yVel;
-
-                        double dotProduct = relativeVelX * dirX + relativeVelY * dirY;
-
-                        if (dotProduct < 0) {
-                            double elasticity = 0.7;
-
-                            double collisionScale = (1.0 + elasticity) * dotProduct / totalMass;
-                            double impulseFactorX = collisionScale * dirX;
-                            double impulseFactorY = collisionScale * dirY;
-
-                            p1.xVel += impulseFactorX * p2.mass;
-                            p1.yVel += impulseFactorY * p2.mass;
-                            p2.xVel -= impulseFactorX * p1.mass;
-                            p2.yVel -= impulseFactorY * p1.mass;
-                        }
-                    }
-                }
-            }
-
-            for (Particle p : particles) {
-                p.updateVelocity();
-            }
-
-            for (Particle p : particles) {
-                p.updatePos();
-            }
-
-            frame.repaint();
-        });
         timer.start();
+    }
+
+    private void updateParticles() {
+        // Reset forces
+        for (Particle p : particles) {
+            p.resetForce();
+        }
+
+        // Calculate forces between particles
+        for (int i = 0; i < particles.size(); i++) {
+            for (int j = i + 1; j < particles.size(); j++) {
+                Particle p1 = particles.get(i);
+                Particle p2 = particles.get(j);
+
+                double[] forceOnP1 = p1.calculateForces(p2);
+                p1.addForce(forceOnP1[0], forceOnP1[1], forceOnP1[2]);
+                p2.addForce(-forceOnP1[0], -forceOnP1[1], -forceOnP1[2]);
+
+                // Handle collisions
+                handleCollision(p1, p2);
+            }
+        }
+
+        // Update velocities and positions
+        for (Particle p : particles) {
+            p.updateVelocity();
+        }
+
+        for (Particle p : particles) {
+            p.updatePos();
+
+            // Update visual representation
+            Sphere sphere = (Sphere) p.getUserData();
+            if (sphere != null) {
+                sphere.setTranslateX(p.getxCor());
+                sphere.setTranslateY(p.getyCor());
+                sphere.setTranslateZ(p.getzCor());
+            }
+        }
+    }
+
+    private void handleCollision(Particle p1, Particle p2) {
+        double distX = p2.getxCor() - p1.getxCor();
+        double distY = p2.getyCor() - p1.getyCor();
+        double distZ = p2.getzCor() - p1.getzCor();
+        double distSq = distX * distX + distY * distY + distZ * distZ;
+
+        double collisionRadiusSum = p1.getRadius() + p2.getRadius();
+        double collisionRadiusSumSq = collisionRadiusSum * collisionRadiusSum;
+
+        if (distSq < collisionRadiusSumSq && distSq > 1e-9) {
+            double dist = Math.sqrt(distSq);
+
+            double overlap = collisionRadiusSum - dist;
+            double dirX = distX / dist;
+            double dirY = distY / dist;
+            double dirZ = distZ / dist;
+
+            double totalMass = p1.getMass() + p2.getMass();
+            double pushFactor1 = (p2.getMass() / totalMass) * overlap;
+            double pushFactor2 = (p1.getMass() / totalMass) * overlap;
+
+            p1.setxCor(p1.getxCor() - dirX * pushFactor1);
+            p1.setyCor(p1.getyCor() - dirY * pushFactor1);
+            p1.setzCor(p1.getzCor() - dirZ * pushFactor1);
+
+            p2.setxCor(p2.getxCor() + dirX * pushFactor2);
+            p2.setyCor(p2.getyCor() + dirY * pushFactor2);
+            p2.setzCor(p2.getzCor() + dirZ * pushFactor2);
+
+            // Handle velocity changes in collision
+            double relativeVelX = p2.getxVel() - p1.getxVel();
+            double relativeVelY = p2.getyVel() - p1.getyVel();
+            double relativeVelZ = p2.getzVel() - p1.getzVel();
+
+            double dotProduct = relativeVelX * dirX + relativeVelY * dirY + relativeVelZ * dirZ;
+
+            if (dotProduct < 0) {
+                double elasticity = 0.7;
+
+                double collisionScale = (1.0 + elasticity) * dotProduct / totalMass;
+                double impulseFactorX = collisionScale * dirX;
+                double impulseFactorY = collisionScale * dirY;
+                double impulseFactorZ = collisionScale * dirZ;
+
+                p1.setxVel(p1.getxVel() + impulseFactorX * p2.getMass());
+                p1.setyVel(p1.getyVel() + impulseFactorY * p2.getMass());
+                p1.setzVel(p1.getzVel() + impulseFactorZ * p2.getMass());
+
+                p2.setxVel(p2.getxVel() - impulseFactorX * p1.getMass());
+                p2.setyVel(p2.getyVel() - impulseFactorY * p1.getMass());
+                p2.setzVel(p2.getzVel() - impulseFactorZ * p1.getMass());
+            }
+        }
+    }
+
+    // Getter methods for simulation parameters
+    public static double getMaxSpeed() {
+        return maxSpeed;
+    }
+
+    public static double getCoulombConstant() {
+        return coulombConstant;
+    }
+
+    public static double getStrongForceOuterRadius() {
+        return strongForceOuterRadius;
+    }
+
+    public static double getStrongForceInnerRadius() {
+        return strongForceInnerRadius;
+    }
+
+    public static double getStrongForceConstant() {
+        return strongForceConstant;
+    }
+
+    public static double getGravityConstant() {
+        return gravityConstant;
     }
 }
