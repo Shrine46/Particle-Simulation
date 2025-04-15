@@ -1,8 +1,12 @@
+package com.shrine.particlesim;
+
 public class Particle {
     protected double xCor; // Use double for smoother motion
     protected double yCor;
     protected double xVel;
     protected double yVel;
+    protected double zVel;
+    protected double zCor;
     protected double mass;
     protected double charge;
     protected String particleType;
@@ -11,12 +15,15 @@ public class Particle {
     // Store forces to update
     protected double netX;
     protected double netY;
+    protected double netZ;
 
-    public Particle(double xCor, double yCor, double xVel, double yVel, double charge, double mass, String particleType) {
+    public Particle(double xCor, double yCor, double zCor, double xVel, double yVel, double zVel, double charge, double mass, String particleType) {
         this.xCor = xCor;
         this.yCor = yCor;
+        this.zCor = zCor;
         this.xVel = xVel;
         this.yVel = yVel;
+        this.zVel = zVel;
         this.charge = charge;
         this.mass = mass;
         this.particleType = particleType;
@@ -32,15 +39,17 @@ public class Particle {
         double time = 0.166666666667; // mult by 10 for sim is super slow
         double maxSpeed = Main.getMaxSpeed();
 
-        double speed = Math.sqrt(xVel * xVel + yVel * yVel);
+        double speed = Math.sqrt(xVel * xVel + yVel * yVel + zVel * zVel);
         if (speed > maxSpeed) {
             xVel *= maxSpeed / speed;
             yVel *= maxSpeed / speed;
+            zVel *= maxSpeed / speed;
         }
         xVel *= .90; // Drag
         yVel *= .90;
         xCor += xVel * time;
         yCor += yVel * time;
+        zCor += zVel * time;
 
         // Bounce off walls
         if (xCor < radius) {
@@ -69,8 +78,10 @@ public class Particle {
         if (this.mass == 0) return;
         double accelX = this.netX / this.mass;
         double accelY = this.netY / this.mass;
+        double accelZ = this.netZ / this.mass;
         this.xVel += accelX * time;
         this.yVel += accelY * time;
+        this.zVel += accelZ * time;
     }
 
     public double[] calculateForces(Particle p2) {
@@ -79,57 +90,67 @@ public class Particle {
         double strongForceInnerRadius = Main.getStrongForceInnerRadius();
         double strongForceConstant = Main.getStrongForceConstant();
         double gravityConstant = Main.getGravityConstant();
-        // Print constants for debugging
-        // System.out.println("kConstant: " + kConstant);
-        // System.out.println("strongForceOuterRadius: " + strongForceOuterRadius);
-        // System.out.println("strongForceInnerRadius: " + strongForceInnerRadius);
-        // System.out.println("strongForceConstant: " + strongForceConstant);
-        // System.out.println("gravityConstant: " + gravityConstant);
-
 
         Particle p1 = this;
         double forceX = 0;
         double forceY = 0;
+        double forceZ = 0;
 
         // Distances
         double distX = p2.getxCor() - p1.getxCor();
         double distY = p2.getyCor() - p1.getyCor();
-        double dist = Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
+        double distZ = p2.getzCor() - p1.getzCor();
+        double distsq = distX * distX + distY * distY + distZ * distZ;
+        double dist = Math.sqrt(distsq);
 
         if (dist < 1e-8) {
-            return new double[] {0,0};
+            return new double[] {0,0,0};
         }
 
         double dirX = distX / dist;
         double dirY = distY / dist;
+        double dirZ = distZ / dist;
 
         // Charges
         double charge1 = p1.getCharge();
         double charge2 = p2.getCharge();
 
         // Culomb Force
-        double coulombForce = (kConstant * charge1 * charge2) / (Math.pow(dist, 2));
+        double coulombForce = (kConstant * charge1 * charge2) / distsq;
         forceX -= coulombForce * dirX;
         forceY -= coulombForce * dirY;
+        forceZ -= coulombForce * dirZ;
 
         // Swirl effect
-
         if ((p1.isElectron() && charge2 > 0) || (p2.isElectron() && charge1 > 0)) {
             double combinedRadius = p1.radius + p2.radius;
             if (dist < combinedRadius + 20) {
-                double tangentialForce = coulombForce * 1.0;
-                double tangentX = -dirY;
-                double tangentY = dirX;
-
-                if ((p1.getxVel() * tangentX + p1.getyVel() * tangentY) < 0) {
-                    tangentX = -tangentX;
-                    tangentY = -tangentY;
-                }
-
-                forceX += tangentialForce * tangentX;
-                forceY += tangentialForce * tangentY;
                 forceX = -forceX;
                 forceY = -forceY;
+                forceZ = -forceZ;
+
+                double helperX = 0;
+                double helperY = 1;
+                double helperZ = 0;
+
+                // Cross product: tangent = dir × helper
+                double tangentX = dirY * helperZ - dirZ * helperY;
+                double tangentY = dirZ * helperX - dirX * helperZ;
+                double tangentZ = dirX * helperY - dirY * helperX;
+
+                // Normalize tangent
+                double mag = Math.sqrt(tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ);
+                if (mag != 0) {
+                    tangentX /= mag;
+                    tangentY /= mag;
+                    tangentZ /= mag;
+
+                    // Apply tangential force
+                    double tangentialForce = coulombForce * 0.5; // tune this
+                    forceX += tangentialForce * tangentX;
+                    forceY += tangentialForce * tangentY;
+                    forceZ += tangentialForce * tangentZ;
+                }
             }
         }
 
@@ -137,29 +158,32 @@ public class Particle {
 
         // Strong Force
         if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {
-            double strongForce = strongForceConstant / Math.pow(dist, 3);
-            double strongForceX;
-            double strongForceY;
+            double strongForce = strongForceConstant / (distsq * dist);
+            double strongForceX, strongForceY, strongForceZ;
 
             if (dist < strongForceInnerRadius) {
                 // Repulsive
                 strongForceX = -strongForce * dirX;
                 strongForceY = -strongForce * dirY;
+                strongForceZ = -strongForce * dirZ;
             } else {
                 // Attractive
                 strongForceX = strongForce * dirX;
                 strongForceY = strongForce * dirY;
+                strongForceZ = strongForce * dirZ;
             }
             forceX += strongForceX;
             forceY += strongForceY;
+            forceZ += strongForceZ;
         }
 
         // Gravity
-        double gravityForce = (gravityConstant * p1.getMass() * p2.getMass()) / Math.pow(dist, 2);
+        double gravityForce = (gravityConstant * p1.getMass() * p2.getMass()) / distsq;
         forceX += gravityForce * dirX;
         forceY += gravityForce * dirY;
+        forceZ += gravityForce * dirZ;
 
-        return new double[] {forceX, forceY};
+        return new double[] {forceX, forceY, forceZ};
     }
 
 
@@ -168,11 +192,13 @@ public class Particle {
     public void resetForce() {
         this.netX = 0.0;
         this.netY = 0.0;
+        this.netZ = 0.0;
     }
 
-    public void addForce(double forceX, double forceY) {
+    public void addForce(double forceX, double forceY, double forceZ) {
         this.netX += forceX;
         this.netY += forceY;
+        this.netZ += forceZ;
     }
 
     public boolean isNucleon() {
@@ -237,5 +263,52 @@ public class Particle {
 
     public void setParticleType(String particleType) {
         this.particleType = particleType;
+    }
+    public double getzVel() {
+        return zVel;
+    }
+
+    public void setzVel(double zVel) {
+        this.zVel = zVel;
+    }
+
+    public double getzCor() {
+        return zCor;
+    }
+
+    public void setzCor(double zCor) {
+        this.zCor = zCor;
+    }
+
+    public double getRadius() {
+        return radius;
+    }
+
+    public void setRadius(double radius) {
+        this.radius = radius;
+    }
+
+    public double getNetX() {
+        return netX;
+    }
+
+    public void setNetX(double netX) {
+        this.netX = netX;
+    }
+
+    public double getNetY() {
+        return netY;
+    }
+
+    public void setNetY(double netY) {
+        this.netY = netY;
+    }
+
+    public double getNetZ() {
+        return netZ;
+    }
+
+    public void setNetZ(double netZ) {
+        this.netZ = netZ;
     }
 }

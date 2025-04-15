@@ -1,11 +1,26 @@
-import java.awt.*;
+package com.shrine.particlesim;
+
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Group;
+import javafx.scene.PerspectiveCamera;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import javafx.scene.shape.*;
+import javafx.scene.control.*;
+import javafx.geometry.Insets;
+import javafx.scene.layout.*;
+import javafx.scene.paint.*;
+import javafx.scene.transform.*;
+import javafx.scene.input.*;
+
+//import java.awt.*;
 import javax.swing.*;
 import java.util.ArrayList;
 import java.awt.event.*;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class Main {
+public class Main extends Application {
     public static ArrayList<Particle> particles = new ArrayList<>();
     private static JFrame frame;
     private static JPanel panel;
@@ -26,7 +41,7 @@ public class Main {
     private static JSlider gravityConstantMultSlider;
 
     // Electron
-    protected static final double electronCharge = -1; // Original = -1.6-19 
+    protected static final double electronCharge = -1; // Original = -1.6-19
     protected static final double electronMass = 10; // Original = 9.109e-31
     // Proton
     protected static final double protonCharge = 1; // Original = 1.6e-19
@@ -85,6 +100,33 @@ public class Main {
         return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
     }
 
+
+
+
+    public void start(Stage primaryStage) {
+        Sphere innerSphere = new Sphere(100);
+        PhongMaterial sphereMaterial = new PhongMaterial();
+        sphereMaterial.setDiffuseColor(Color.LIGHTBLUE);
+        innerSphere.setMaterial(sphereMaterial);
+        Group root = new Group(innerSphere);
+
+        Scene scene = new Scene(root, 800, 600);
+        primaryStage.setTitle("My JavaFX App");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        // Camera
+        PerspectiveCamera camera = new PerspectiveCamera(true);
+        camera.setTranslateZ(-1000);
+        scene.setCamera(camera);
+
+
+    }
+
+
+    public static void main(String[] args) {
+        launch(args);
+    }
 
 
     public static void display() {
@@ -408,8 +450,8 @@ public class Main {
                     Particle p2 = particles.get(j);
 
                     double[] forceOnP1 = p1.calculateForces(p2);
-                    p1.addForce(forceOnP1[0], forceOnP1[1]);
-                    p2.addForce(-forceOnP1[0], -forceOnP1[1]);
+                    p1.addForce(forceOnP1[0], forceOnP1[1], forceOnP1[2]);
+                    p2.addForce(-forceOnP1[0], -forceOnP1[1], -forceOnP1[2]);
 
                     double distX = p2.xCor - p1.xCor;
                     double distY = p2.yCor - p1.yCor;
@@ -467,9 +509,5 @@ public class Main {
             frame.repaint();
         });
         timer.start();
-    }
-
-    public static void main(String[] args) {
-        display();
     }
 }

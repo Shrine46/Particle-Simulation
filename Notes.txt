@@ -1,0 +1,2 @@
+Things skipped while porting to 3d
+- Bounce off walls logic in update(), planning to make the play area a sphere
