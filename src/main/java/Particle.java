@@ -47,16 +47,16 @@ public class Particle {
             xCor = radius;
             xVel = -xVel;
         } else if (xCor > 1920 - radius) {
-            xCor = 1920 - radius; 
-            xVel = -xVel; 
+            xCor = 1920 - radius;
+            xVel = -xVel;
         }
 
         if (yCor < radius) {
-            yCor = radius; 
-            yVel = -yVel; 
+            yCor = radius;
+            yVel = -yVel;
         } else if (yCor > 1080 - radius) {
-            yCor = 1080 - radius; 
-            yVel = -yVel; 
+            yCor = 1080 - radius;
+            yVel = -yVel;
         }
     }
 
@@ -66,7 +66,7 @@ public class Particle {
 
         double time = 0.166666666667; // mult by 10 for sim is super slow
 
-        if (this.mass == 0) return; 
+        if (this.mass == 0) return;
         double accelX = this.netX / this.mass;
         double accelY = this.netY / this.mass;
         this.xVel += accelX * time;
@@ -117,7 +117,7 @@ public class Particle {
         if ((p1.isElectron() && charge2 > 0) || (p2.isElectron() && charge1 > 0)) {
             double combinedRadius = p1.radius + p2.radius;
             if (dist < combinedRadius + 20) {
-                double tangentialForce = coulombForce * 1.0; 
+                double tangentialForce = coulombForce * 1.0;
                 double tangentX = -dirY;
                 double tangentY = dirX;
 
@@ -132,8 +132,8 @@ public class Particle {
                 forceY = -forceY;
             }
         }
-        
-        
+
+
 
         // Strong Force
         if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {

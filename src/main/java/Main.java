@@ -3,13 +3,13 @@ import javax.swing.*;
 import java.util.ArrayList;
 import java.awt.event.*;
 import java.util.Random;
-import 
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Main {
     public static ArrayList<Particle> particles = new ArrayList<>();
     private static JFrame frame;
     private static JPanel panel;
-    private static Random rand;
+    private static ThreadLocalRandom rand;
     private static Timer timer;
 
     // Slider Values
@@ -56,7 +56,7 @@ public class Main {
         }
         return strongForceInnerRadiusSlider.getValue();
     }
-    
+
     public static int getFPS() {
         if (FPSSlider == null) {
             return 60; // Default FPS
@@ -70,29 +70,29 @@ public class Main {
         }
         return kConstantSlider.getValue() * Math.pow(10, kConstantMultSlider.getValue());
     }
-    
+
     public static double getStrongForceConstant() {
         if (strongForceConstantSlider == null || strongForceConstantMultSlider == null) {
             return 6e5; // Default strong force constant
         }
         return strongForceConstantSlider.getValue() * Math.pow(10, strongForceConstantMultSlider.getValue());
     }
-    
+
     public static double getGravityConstant() {
         if (gravityConstantSlider == null || gravityConstantMultSlider == null) {
             return 1e1; // Default gravity constant
         }
         return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
     }
-    
-    
+
+
 
     public static void display() {
         frame = new JFrame("Particle Playground");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1920, 1080);
 
-        rand = new Random();
+        rand = ThreadLocalRandom.current();
 
 
 
@@ -126,10 +126,8 @@ public class Main {
         panel.setBackground(Color.LIGHT_GRAY);
         panel.setFocusable(true);
 
-
-
         // Sliders and Labels -----------------------------------------------------------------------------------------------------------------
-        
+
         JPanel sliderPanel = new JPanel();
         sliderPanel.setLayout(new BoxLayout(sliderPanel, BoxLayout.Y_AXIS));
 
@@ -143,7 +141,7 @@ public class Main {
         // Clear Particles
         JButton clearParticles = new JButton("Clear Particles");
         clearParticles.addActionListener(e -> particles.clear());
-        
+
         topRightPanel.add(clearParticles);
 
 
@@ -205,7 +203,7 @@ public class Main {
 
         topRightPanel.add(FPSLabel);
         topRightPanel.add(FPSSlider);
-        
+
         // Strong Force Outer Radius Slider
         JLabel strongForceOuterRadiusLabel = new JLabel("Strong Force Outer Radius = 27");
         strongForceOuterRadiusSlider = new JSlider(10, 50, 27);
@@ -240,7 +238,7 @@ public class Main {
         maxSpeedSlider.setPreferredSize(new Dimension(300, 50));
         maxSpeedMultSlider.setOrientation(SwingConstants.HORIZONTAL);
         maxSpeedMultSlider.setPreferredSize(new Dimension(300, 50));
-    
+
         maxSpeedMultSlider.addChangeListener(e -> {
             maxSpeedMultLabel.setText("Max Speed = e" + maxSpeedMultSlider.getValue());
             maxSpeedLabel.setText("Max Speed = " + maxSpeedSlider.getValue() + "e" + maxSpeedMultSlider.getValue());
@@ -333,8 +331,8 @@ public class Main {
 
 
         // Key bindings -----------------------------------------------------------------------------------------------------------------
-        
-        
+
+
 
         panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, 0), "spawnElectron");
         panel.getActionMap().put("spawnElectron", new AbstractAction() {
@@ -344,7 +342,7 @@ public class Main {
                 SwingUtilities.convertPointFromScreen(p, panel);
                 double offsetX = rand.nextDouble(-5, 5);
                 double offsetY = rand.nextDouble(-5, 5);
-                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), electronCharge, electronMass, "electron"); 
+                Particle electron = new Particle(p.x + offsetX, p.y + offsetY, rand.nextDouble(-4, 4), rand.nextDouble(-4, 4), electronCharge, electronMass, "electron");
                 particles.add(electron);
             }
         });
@@ -420,7 +418,7 @@ public class Main {
                     double collisionRadiusSum = p1.radius + p2.radius;
                     double collisionRadiusSumSq = collisionRadiusSum * collisionRadiusSum;
 
-                    if (distSq < collisionRadiusSumSq && distSq > 1e-9) { 
+                    if (distSq < collisionRadiusSumSq && distSq > 1e-9) {
                         double dist = Math.sqrt(distSq);
 
                         double overlap = collisionRadiusSum - dist;
@@ -449,7 +447,7 @@ public class Main {
                             double impulseFactorX = collisionScale * dirX;
                             double impulseFactorY = collisionScale * dirY;
 
-                            p1.xVel += impulseFactorX * p2.mass; 
+                            p1.xVel += impulseFactorX * p2.mass;
                             p1.yVel += impulseFactorY * p2.mass;
                             p2.xVel -= impulseFactorX * p1.mass;
                             p2.yVel -= impulseFactorY * p1.mass;
