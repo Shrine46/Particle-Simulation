@@ -1,0 +1,65 @@
+import javafx.application.Application;
+import javafx.scene.*;
+import javafx.scene.paint.*;
+import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
+import javafx.animation.AnimationTimer;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import org.json.*;
+
+public class SimulationViewer extends Application {
+    private List<JSONArray> frames = new ArrayList<>();
+    private int frameIndex = 0;
+
+    Map<String, Circle> particleMap = new HashMap<>();
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        Group root = new Group();
+        Scene scene = new Scene(root, 600, 600, Color.BLACK);
+
+        loadFrames(); // Load JSON from Python
+
+        // Create particles
+        JSONArray firstFrame = frames.get(0);
+        for (int i = 0; i < firstFrame.length(); i++) {
+            JSONObject particle = firstFrame.getJSONObject(i);
+            Circle c = new Circle(5, particle.getString("type").equals("neutron") ? Color.BLUE : Color.RED);
+            root.getChildren().add(c);
+            particleMap.put(particle.getString("id"), c);
+        }
+
+        new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                JSONArray particles = frames.get(frameIndex);
+                for (int i = 0; i < particles.length(); i++) {
+                    JSONObject p = particles.getJSONObject(i);
+                    Circle c = particleMap.get(p.getString("id"));
+                    c.setCenterX(p.getDouble("x") + 300); // offset for center
+                    c.setCenterY(p.getDouble("y") + 300);
+                }
+                frameIndex = (frameIndex + 1) % frames.size();
+            }
+        }.start();
+
+        stage.setTitle("Particle Simulation");
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    private void loadFrames() throws Exception {
+        String content = Files.readString(Path.of("sim_data.json"));
+        JSONArray rawFrames = new JSONArray(content);
+        for (int i = 0; i < rawFrames.length(); i++) {
+            JSONObject frame = rawFrames.getJSONObject(i);
+            frames.add(frame.getJSONArray("particles"));
+        }
+    }
+
+    public static void main(String[] args) {
+        launch();
+    }
+}

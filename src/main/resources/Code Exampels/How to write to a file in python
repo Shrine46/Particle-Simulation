@@ -1,0 +1,47 @@
+import json
+import math
+
+frames = []
+
+for t in range(100):  # simulate 100 time steps
+    angle = 0.1 * t
+    r = 100  # radius
+
+    # Two orbiting particles
+    particle1 = {
+        "id": "n1",
+        "x": r * math.cos(angle),
+        "y": r * math.sin(angle),
+        "type": "neutron"
+    }
+
+    particle2 = {
+        "id": "p1",
+        "x": -r * math.cos(angle),
+        "y": -r * math.sin(angle),
+        "type": "proton"
+    }
+
+    frames.append({
+        "time": t,
+        "particles": [particle1, particle2]
+    })
+
+# Write to file
+with open("sim_data.json", "w") as f:
+    json.dump(frames, f)
+
+
+#############
+result =
+[
+  {
+    "time": 0,
+    "particles": [
+      {"id": "n1", "x": 100.0, "y": 0.0, "type": "neutron"},
+      {"id": "p1", "x": -100.0, "y": 0.0, "type": "proton"}
+    ]
+  },
+  ...
+]
+
