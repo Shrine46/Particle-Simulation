@@ -1,0 +1,44 @@
+import socket
+import json
+import threading
+import time
+
+HOST = 'localhost'
+PORT = 65432
+particles = []
+
+# Thread-safe lock
+from threading import Lock
+lock = Lock()
+
+# Physics loop (runs independently of socket)
+def simulate():
+    while True:
+        with lock:
+            for p in particles:
+                # Example: gravity on Y
+                p[1] -= 0.1  # Modify Y position
+        time.sleep(0.016)  # ~60 FPS
+
+# Handle incoming commands from Java
+def listen_for_commands():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen()
+        print("Waiting for connection...")
+        conn, addr = s.accept()
+        with conn:
+            print(f'Connected by {addr}')
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+                msg = json.loads(data.decode())
+                if msg['action'] == 'spawn':
+                    with lock:
+                        particles.append(msg['position'])
+                        print(f"Spawned at {msg['position']}")
+
+# Start both loops
+threading.Thread(target=simulate, daemon=True).start()
+listen_for_commands()
