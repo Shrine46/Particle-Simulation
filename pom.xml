@@ -60,7 +60,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>com.shrine.particlesim.ParticleSimulation</mainClass>
+                    <mainClass>com.shrine.particlesim.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>

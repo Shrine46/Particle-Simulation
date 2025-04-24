@@ -54,17 +54,17 @@ public class Particle {
         }
 
         // Apply drag
-        xVel *= .90;
-        yVel *= .90;
-        zVel *= .90;
+        xVel *= .99;
+        yVel *= .99;
+        zVel *= .99;
 
         // Update position
         xCor += xVel * time;
         yCor += yVel * time;
         zCor += zVel * time;
 
-        // Bounce off simulation boundary (now a cube instead of walls)
-        double boundary = 400; // Size of simulation space
+        // Bounce off boundary
+        double boundary = 2000; // Size
         if (xCor < -boundary + radius) {
             xCor = -boundary + radius;
             xVel = -xVel;
@@ -91,7 +91,7 @@ public class Particle {
     }
 
     public void updateVelocity() {
-        double time = 0.166666666667; // mult by 10 for sim is super slow
+        double time = 0.0166666666667; // mult by 10 for sim is super slow
 
         if (this.mass == 0) return;
         double accelX = this.netX / this.mass;
