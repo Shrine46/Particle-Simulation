@@ -49,13 +49,22 @@ public class Main extends Application {
     private static Slider strongForceInnerRadiusSlider;
     private static Slider FPSSlider;
     private static Slider strongForceOuterRadiusSlider;
-    private static Slider kConstantSlider;
-    private static Slider kConstantMultSlider;
+    private static Slider coulombConstantSlider;
+    private static Slider coulombConstantMultSlider;
     private static Slider strongForceConstantSlider;
     private static Slider strongForceConstantMultSlider;
     private static Slider gravityConstantSlider;
     private static Slider gravityConstantMultSlider;
 
+    // Inital Constants
+    private static final double STRONG_FORCE_CONSTANT = 6e5;
+    private static final double GRAVITY_CONSTANT = 1e1;
+    private static final double COULOMB_CONSTANT = 4e5;
+    private static final double STRONG_FORCE_INNER_RADIUS = 9;
+    private static final double STRONG_FORCE_OUTER_RADIUS = 27; 
+    private static final double MAX_SPEED = 1e4; 
+    private static final double FPS = 60;
+    
     // Random
     private static Random rand;
 
@@ -70,51 +79,52 @@ public class Main extends Application {
     protected static final double neutronCharge = 0;
     protected static final double neutronMass = 100; // Original = 1.67492749804e-29
 
+    
     public static double getMaxSpeed() {
         if (maxSpeedSlider == null || maxSpeedMultSlider == null) {
-            return 1e; // Default max speed
+            return MAX_SPEED; // Default max speed
         }
         return maxSpeedSlider.getValue() * Math.pow(10, maxSpeedMultSlider.getValue());
     }
 
     public static double getStrongForceOuterRadius() {
         if (strongForceOuterRadiusSlider == null) {
-            return 27; // Default strong force outer radius
+            return STRONG_FORCE_OUTER_RADIUS; // Default strong force outer radius
         }
         return strongForceOuterRadiusSlider.getValue();
     }
 
     public static double getStrongForceInnerRadius() {
         if (strongForceInnerRadiusSlider == null) {
-            return 9; // Default strong force inner radius
+            return STRONG_FORCE_INNER_RADIUS; // Default strong force inner radius
         }
         return strongForceInnerRadiusSlider.getValue();
     }
     
     public static double getFPS() {
         if (FPSSlider == null) {
-            return 60; // Default FPS
+            return FPS; // Default FPS
         }
         return FPSSlider.getValue();
     }
 
     public static double getCoulombConstant() {
-        if (kConstantSlider == null || kConstantMultSlider == null) {
-            return 4e5; // Default Coulomb constant
+        if (coulombConstantSlider == null || coulombConstantMultSlider == null) {
+            return COULOMB_CONSTANT; // Default Coulomb constant
         }
-        return kConstantSlider.getValue() * Math.pow(10, kConstantMultSlider.getValue());
+        return coulombConstantSlider.getValue() * Math.pow(10, coulombConstantMultSlider.getValue());
     }
     
     public static double getStrongForceConstant() {
         if (strongForceConstantSlider == null || strongForceConstantMultSlider == null) {
-            return 6e5; // Default strong force constant
+            return STRONG_FORCE_CONSTANT; // Default strong force constant
         }
         return strongForceConstantSlider.getValue() * Math.pow(10, strongForceConstantMultSlider.getValue());
     }
     
     public static double getGravityConstant() {
         if (gravityConstantSlider == null || gravityConstantMultSlider == null) {
-            return 1e1; // Default gravity constant
+            return GRAVITY_CONSTANT; // Default gravity constant
         }
         return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
     }
@@ -125,7 +135,7 @@ public class Main extends Application {
         rand = new Random();
 
         // Add 20 of each particle type within the bounds
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 1000; i++) {
             double x = rand.nextDouble() * WINDOW_WIDTH - WINDOW_WIDTH / 2;
             double y = rand.nextDouble() * WINDOW_HEIGHT - WINDOW_HEIGHT / 2;
             double z = rand.nextDouble() * 1000 - 500; // Random Z within a range
@@ -194,7 +204,7 @@ public class Main extends Application {
                             
                             double[] forceOnP1 = p1.calculateForces(p2);
                             p1.addForce(forceOnP1[0], forceOnP1[1], forceOnP1[2]);
-                            p2.addForce(-forceOnP1[0], -forceOnP1[1], forceOnP1[2]);
+                            p2.addForce(-forceOnP1[0], -forceOnP1[1], -forceOnP1[2]);
                             double distX = p2.getxCor() - p1.getxCor();
                             double distY = p2.getyCor()  - p1.getyCor();
                             double distZ = p2.getzCor() - p1.getzCor();
@@ -237,13 +247,13 @@ public class Main extends Application {
                                     double impulseFactorY = collisionScale * dirY;
                                     double impulseFactorZ = collisionScale * dirZ;
                                     
-                                    p1.setxVel(p1.getxVel() - impulseFactorX * p2.getMass());
-                                    p1.setyVel(p1.getyVel() - impulseFactorY * p2.getMass());
-                                    p1.setzVel(p1.getzVel() - impulseFactorZ * p2.getMass());
-                                    
-                                    p2.setxVel(p2.getxVel() + impulseFactorX * p1.getMass());
-                                    p2.setyVel(p2.getyVel() + impulseFactorY * p1.getMass());
-                                    p2.setzVel(p2.getzVel() + impulseFactorZ * p1.getMass());
+                                    p1.setxVel(p1.getxVel() + impulseFactorX * p2.getMass());
+                                    p1.setyVel(p1.getyVel() + impulseFactorY * p2.getMass());
+                                    p1.setzVel(p1.getzVel() + impulseFactorZ * p2.getMass());
+
+                                    p2.setxVel(p2.getxVel() - impulseFactorX * p1.getMass());
+                                    p2.setyVel(p2.getyVel() - impulseFactorY * p1.getMass());
+                                    p2.setzVel(p2.getzVel() - impulseFactorZ * p1.getMass());
                                 }
                             }
                         }

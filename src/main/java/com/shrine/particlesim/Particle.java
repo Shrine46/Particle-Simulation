@@ -1,5 +1,4 @@
-@ -1,340 +1,340 @@
-        package com.shrine.particlesim;
+package com.shrine.particlesim;
 
 public class Particle {
     protected double xCor; // Use double for smoother motion
@@ -67,10 +66,7 @@ public class Particle {
         yCor += yVel * time;
         zCor += zVel * time;
 
-        // Bounce off simulation boundary (now a cube instead of walls)
-        double boundary = 400; // Size of simulation space
-        // Bounce off boundary
-        double boundary = 2000; // Size
+        double boundary = 1000; // Size
         if (xCor < -boundary + radius) {
             xCor = -boundary + radius;
             xVel = -xVel;
@@ -98,7 +94,6 @@ public class Particle {
 
     public void updateVelocity() {
         double time = 0.166666666667; // mult by 10 for sim is super slow
-        double time = 0.0166666666667; // mult by 10 for sim is super slow
 
         if (this.mass == 0) return;
         double accelX = this.netX / this.mass;
@@ -335,13 +330,5 @@ public class Particle {
 
     public void setNetZ(double netZ) {
         this.netZ = netZ;
-    }
-
-    public Object getUserData() {
-        return userData;
-    }
-
-    public void setUserData(Object userData) {
-        this.userData = userData;
     }
 }
