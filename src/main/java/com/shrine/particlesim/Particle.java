@@ -57,38 +57,38 @@ public class Particle {
         xVel *= .90;
         yVel *= .90;
         zVel *= .90;
-        xVel *= .99;
-        yVel *= .99;
-        zVel *= .99;
 
         // Update position
         xCor += xVel * time;
         yCor += yVel * time;
         zCor += zVel * time;
 
-        double boundary = 1000; // Size
+        // Get current boundary size from Main class
+        double boundary = Main.getBoundarySize();
+        
+        // Bounce off simulation boundary
         if (xCor < -boundary + radius) {
             xCor = -boundary + radius;
-            xVel = -xVel;
+            xVel = -xVel * 0.8;
         } else if (xCor > boundary - radius) {
             xCor = boundary - radius;
-            xVel = -xVel;
+            xVel = -xVel * 0.8;
         }
 
         if (yCor < -boundary + radius) {
             yCor = -boundary + radius;
-            yVel = -yVel;
+            yVel = -yVel * 0.8;
         } else if (yCor > boundary - radius) {
             yCor = boundary - radius;
-            yVel = -yVel;
+            yVel = -yVel * 0.8;
         }
 
         if (zCor < -boundary + radius) {
             zCor = -boundary + radius;
-            zVel = -zVel;
+            zVel = -zVel * 0.8;
         } else if (zCor > boundary - radius) {
             zCor = boundary - radius;
-            zVel = -zVel;
+            zVel = -zVel * 0.8;
         }
     }
 

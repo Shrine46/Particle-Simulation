@@ -1,17 +1,33 @@
 package com.shrine.particlesim;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.AmbientLight;
 import javafx.scene.Group;
 import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
 import javafx.scene.Scene;
 import javafx.scene.SceneAntialiasing;
-import javafx.scene.control.Slider;
+import javafx.scene.SubScene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Sphere;
@@ -20,19 +36,21 @@ import javafx.scene.transform.Translate;
 import javafx.stage.Stage;
 
 public class Main extends Application {
-    private static ArrayList<Particle> particles = new ArrayList<>();
-    private static ArrayList<Sphere> particleSpheres = new ArrayList<>();
+    private static final ArrayList<Particle> particles = new ArrayList<>();
+    private static final ArrayList<Sphere> particleSpheres = new ArrayList<>();
+    private static ExecutorService executor;
+    private static final int NUM_THREADS = Runtime.getRuntime().availableProcessors();
 
     // JavaFx
-    private static final double WINDOW_WIDTH = 2000;
-    private static final double WINDOW_HEIGHT = 2000;
+    private static final double WINDOW_WIDTH = 1000;
+    private static final double WINDOW_HEIGHT = 1000;
 
     private static final double CAMERA_NEAR_CLIP = 0.1;
-    private static final double CAMERA_FAR_CLIP = 10000.0;
-    private static final double CAMERA_INITIAL_Z = -1000; // Start back from the origin
+    private static final double CAMERA_FAR_CLIP = 100000.0; // Increased from 10000 to 100000
+    private static final double CAMERA_INITIAL_Z = -500;
 
-    private static final double MOVE_SPEED = 100.0; // How fast the camera moves
-    private static final double MOUSE_SENSITIVITY = 0.1; // How sensitive mouse rotation is
+    private static final double BASE_MOVE_SPEED = 100.0;
+    private static final double MOUSE_SENSITIVITY = 0.1;
 
     private PerspectiveCamera camera;
     private Group root;
@@ -43,20 +61,7 @@ public class Main extends Application {
     private double lastMouseX = -1;
     private double lastMouseY = -1;
 
-    // Slider Values
-    private static Slider maxSpeedSlider;
-    private static Slider maxSpeedMultSlider;
-    private static Slider strongForceInnerRadiusSlider;
-    private static Slider FPSSlider;
-    private static Slider strongForceOuterRadiusSlider;
-    private static Slider coulombConstantSlider;
-    private static Slider coulombConstantMultSlider;
-    private static Slider strongForceConstantSlider;
-    private static Slider strongForceConstantMultSlider;
-    private static Slider gravityConstantSlider;
-    private static Slider gravityConstantMultSlider;
-
-    // Inital Constants
+    // Constants
     private static final double STRONG_FORCE_CONSTANT = 6e5;
     private static final double GRAVITY_CONSTANT = 1e1;
     private static final double COULOMB_CONSTANT = 4e5;
@@ -79,85 +84,165 @@ public class Main extends Application {
     protected static final double neutronCharge = 0;
     protected static final double neutronMass = 100; // Original = 1.67492749804e-29
 
+    private static PhongMaterial electronMaterial;
+    private static PhongMaterial protonMaterial;
+    private static PhongMaterial neutronMaterial;
+
+    private static double boundarySize = 500; // Default boundary size (half of window size)
+    private TextField boundarySizeField;
+
+    // UI Controls
+    private TextField particleCountField;
+    private ComboBox<String> particleTypeComboBox;
+    private Button spawnButton;
+    
+    private void initializeMaterials() {
+        electronMaterial = new PhongMaterial();
+        electronMaterial.setDiffuseColor(Color.BLUE);
+        electronMaterial.setSpecularColor(Color.LIGHTBLUE);
+        electronMaterial.setSpecularPower(32);
+
+        protonMaterial = new PhongMaterial();
+        protonMaterial.setDiffuseColor(Color.RED);
+        protonMaterial.setSpecularColor(Color.PINK);
+        protonMaterial.setSpecularPower(32);
+
+        neutronMaterial = new PhongMaterial();
+        neutronMaterial.setDiffuseColor(Color.GRAY);
+        neutronMaterial.setSpecularColor(Color.WHITE);
+        neutronMaterial.setSpecularPower(32);
+    }
     
     public static double getMaxSpeed() {
-        if (maxSpeedSlider == null || maxSpeedMultSlider == null) {
-            return MAX_SPEED; // Default max speed
-        }
-        return maxSpeedSlider.getValue() * Math.pow(10, maxSpeedMultSlider.getValue());
+        return MAX_SPEED; // Default max speed
     }
 
     public static double getStrongForceOuterRadius() {
-        if (strongForceOuterRadiusSlider == null) {
-            return STRONG_FORCE_OUTER_RADIUS; // Default strong force outer radius
-        }
-        return strongForceOuterRadiusSlider.getValue();
+        return STRONG_FORCE_OUTER_RADIUS; // Default strong force outer radius
     }
 
     public static double getStrongForceInnerRadius() {
-        if (strongForceInnerRadiusSlider == null) {
-            return STRONG_FORCE_INNER_RADIUS; // Default strong force inner radius
-        }
-        return strongForceInnerRadiusSlider.getValue();
+        return STRONG_FORCE_INNER_RADIUS; // Default strong force inner radius
     }
     
     public static double getFPS() {
-        if (FPSSlider == null) {
-            return FPS; // Default FPS
-        }
-        return FPSSlider.getValue();
+        return FPS; // Default FPS
     }
 
     public static double getCoulombConstant() {
-        if (coulombConstantSlider == null || coulombConstantMultSlider == null) {
-            return COULOMB_CONSTANT; // Default Coulomb constant
-        }
-        return coulombConstantSlider.getValue() * Math.pow(10, coulombConstantMultSlider.getValue());
+        return COULOMB_CONSTANT; // Default Coulomb constant
     }
     
     public static double getStrongForceConstant() {
-        if (strongForceConstantSlider == null || strongForceConstantMultSlider == null) {
-            return STRONG_FORCE_CONSTANT; // Default strong force constant
-        }
-        return strongForceConstantSlider.getValue() * Math.pow(10, strongForceConstantMultSlider.getValue());
+        return STRONG_FORCE_CONSTANT; // Default strong force constant
     }
     
     public static double getGravityConstant() {
-        if (gravityConstantSlider == null || gravityConstantMultSlider == null) {
-            return GRAVITY_CONSTANT; // Default gravity constant
-        }
-        return gravityConstantSlider.getValue() * Math.pow(10, gravityConstantMultSlider.getValue());
+        return GRAVITY_CONSTANT; // Default gravity constant
+    }
+
+    public static double getBoundarySize() {
+        return boundarySize;
     }
     
+    private double getScaledMoveSpeed() {
+        return BASE_MOVE_SPEED * (boundarySize / 500.0); // Scale with boundary size relative to default
+    }
+
     @Override
     public void start(Stage primaryStage) {
+        executor = Executors.newFixedThreadPool(NUM_THREADS);
+        
+        initializeMaterials();
         root = new Group();
         rand = new Random();
 
-        // Add 20 of each particle type within the bounds
-        for (int i = 0; i < 1000; i++) {
-            double x = rand.nextDouble() * WINDOW_WIDTH - WINDOW_WIDTH / 2;
-            double y = rand.nextDouble() * WINDOW_HEIGHT - WINDOW_HEIGHT / 2;
-            double z = rand.nextDouble() * 1000 - 500; // Random Z within a range
+        // Create UI controls
+        VBox controls = new VBox(10); // 10 pixels spacing
+        controls.setAlignment(Pos.TOP_LEFT);
+        controls.setPadding(new Insets(10));
+        controls.setStyle("-fx-background-color: rgba(255, 255, 255, 0.7);");
+        controls.setMaxWidth(200);
+        controls.setMouseTransparent(false);
+        
+        Label countLabel = new Label("Number of Particles:");
+        particleCountField = new TextField("10");
+        particleCountField.setPrefWidth(100);
+        
+        Label typeLabel = new Label("Particle Type:");
+        particleTypeComboBox = new ComboBox<>();
+        particleTypeComboBox.getItems().addAll("electron", "proton", "neutron");
+        particleTypeComboBox.setValue("electron");
 
-            // Add electrons
+        Label boundaryLabel = new Label("Boundary Size:");
+        boundarySizeField = new TextField(String.valueOf((int)boundarySize));
+        boundarySizeField.setPrefWidth(100);
+        boundarySizeField.setOnAction(e -> updateBoundarySize());
+        boundarySizeField.focusedProperty().addListener((obs, oldVal, newVal) -> {
+            if (!newVal) { // Focus lost
+                updateBoundarySize();
+            }
+        });
+        
+        spawnButton = new Button("Spawn Particles");
+        spawnButton.setOnAction(e -> spawnParticles());
+
+        Button clearButton = new Button("Clear Particles");
+        clearButton.setOnAction(e -> clearParticles());
+        
+        controls.getChildren().addAll(
+            countLabel,
+            particleCountField,
+            typeLabel,
+            particleTypeComboBox,
+            boundaryLabel,
+            boundarySizeField,
+            spawnButton,
+            clearButton
+        );
+
+        // Reduce the number of particles for better performance
+        for (int i = 0; i < 300; i++) {
+            double x = rand.nextDouble() * boundarySize * 2 - boundarySize;
+            double y = rand.nextDouble() * boundarySize * 2 - boundarySize;
+            double z = rand.nextDouble() * boundarySize * 2 - boundarySize;
+
+            // Add particles with more spacing
             particles.add(new Particle(x, y, z, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), electronCharge, electronMass, "electron"));
-
-            // Add protons
-            particles.add(new Particle(x, y, z, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), protonCharge, protonMass, "proton"));
-
-            // Add neutrons
-            particles.add(new Particle(x, y, z, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), neutronCharge, neutronMass, "neutron"));
+            particles.add(new Particle(x + 100, y + 100, z + 100, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), protonCharge, protonMass, "proton"));
+            particles.add(new Particle(x - 100, y - 100, z - 100, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), neutronCharge, neutronMass, "neutron"));
         }
 
+        // Pre-create and configure all sphere objects
         for (Particle p : particles) {
             Sphere particleSphere = new Sphere(p.getRadius());
+            if (p.getParticleType().equals("electron")) {
+                particleSphere.setMaterial(electronMaterial);
+            } else if (p.getParticleType().equals("proton")) {
+                particleSphere.setMaterial(protonMaterial);
+            } else {
+                particleSphere.setMaterial(neutronMaterial);
+            }
             particleSpheres.add(particleSphere);
             root.getChildren().add(particleSphere);
         }
 
-        AmbientLight light = new AmbientLight(Color.rgb(150, 150, 150)); // Soft white light
-        root.getChildren().add(light);
+        // Add multiple light sources for better depth perception
+        AmbientLight ambientLight = new AmbientLight(Color.rgb(50, 50, 50));
+        root.getChildren().add(ambientLight);
+        
+        // Add directional lights from different angles
+        PointLight mainLight = new PointLight(Color.WHITE);
+        mainLight.setTranslateX(boundarySize * 2);
+        mainLight.setTranslateY(-boundarySize * 2);
+        mainLight.setTranslateZ(-boundarySize * 2);
+        
+        PointLight fillLight = new PointLight(Color.rgb(200, 200, 255));
+        fillLight.setTranslateX(-boundarySize * 2);
+        fillLight.setTranslateY(boundarySize);
+        fillLight.setTranslateZ(boundarySize * 2);
+        
+        root.getChildren().addAll(mainLight, fillLight);
 
         // --- 3. Setup the Camera ---
         camera = new PerspectiveCamera(true); // true = fixed eye at (0,0,0) initially
@@ -172,134 +257,108 @@ public class Main extends Application {
         );
         pivot.setZ(CAMERA_INITIAL_Z);
 
-
-        // --- 4. Create the Scene ---
-        // IMPORTANT: Use true for the depthBuffer parameter to enable 3D rendering
-        Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT, true, SceneAntialiasing.BALANCED);
-        scene.setFill(Color.LIGHTGRAY); // Background color
-        scene.setCamera(camera);
+        // Create a StackPane to hold both the 3D content and the 2D overlay
+        StackPane stackPane = new StackPane();
+        SubScene subScene = new SubScene(root, WINDOW_WIDTH, WINDOW_HEIGHT, true, SceneAntialiasing.BALANCED);
+        subScene.setFill(Color.LIGHTGRAY);
+        subScene.setCamera(camera);
+        
+        stackPane.getChildren().addAll(subScene, controls);
+        StackPane.setAlignment(controls, Pos.TOP_LEFT);
+        
+        // Create the main scene with the StackPane
+        Scene scene = new Scene(stackPane, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         // --- 5. Setup Input Handlers ---
         setupKeyHandlers(scene, pivot);
-        setupMouseHandlers(scene);
-        setupScrollHandler(scene, pivot);
+        setupMouseHandlers(subScene);
+        setupScrollHandler(subScene, pivot);
 
         AnimationTimer gameLoop = new AnimationTimer() {
             private long lastUpdate = 0;
-            private final long frameInterval = 1_000_000_000 / 60; // Target FPS (e.g., 60 FPS)
+            private static final long FRAME_INTERVAL = 16_666_666L; // 60 FPS in nanoseconds
 
             @Override
             public void handle(long now) {
-                if (now - lastUpdate >= frameInterval) {
-                    lastUpdate = now;
+                if (now - lastUpdate < FRAME_INTERVAL) {
+                    return; // Skip this frame if not enough time has passed
+                }
+                lastUpdate = now;
 
-                    for (Particle p : particles) {
-                        p.resetForce();
-                    }
+                // Reset forces
+                particles.parallelStream().forEach(Particle::resetForce);
 
-                    for (int i = 0; i < particles.size(); i++) {
-                        for (int j = i + 1; j < particles.size(); j++) {
-                            Particle p1 = particles.get(i);
-                            Particle p2 = particles.get(j);
-                            
-                            double[] forceOnP1 = p1.calculateForces(p2);
-                            p1.addForce(forceOnP1[0], forceOnP1[1], forceOnP1[2]);
-                            p2.addForce(-forceOnP1[0], -forceOnP1[1], -forceOnP1[2]);
-                            double distX = p2.getxCor() - p1.getxCor();
-                            double distY = p2.getyCor()  - p1.getyCor();
-                            double distZ = p2.getzCor() - p1.getzCor();
-                            double distSq = distX * distX + distY * distY + distZ * distZ;
-                            
-                            double collisionRadiusSum = p1.getRadius() + p2.getRadius();
-                            double collisionRadiusSumSq = collisionRadiusSum * collisionRadiusSum;
-                            
-                            if (distSq < collisionRadiusSumSq && distSq > 1e-9) {
-                                double dist = Math.sqrt(distSq);
-                                double overlap = collisionRadiusSum - dist;
-                                
-                                double dirX = distX / dist;
-                                double dirY = distY / dist;
-                                double dirZ = distZ / dist;
-                                
-                                double totalMass = p1.getMass() + p2.getMass();
-                                double pushFactor1 = (p2.getMass() / totalMass) * overlap;
-                                double pushFactor2 = (p1.getMass() / totalMass) * overlap;
-                                
-                                p1.setxCor(p1.getxCor() - dirX * pushFactor1);
-                                p1.setyCor(p1.getyCor() - dirY * pushFactor1);
-                                p1.setzCor(p1.getzCor() - dirZ * pushFactor1);
-                                
-                                p2.setxCor(p2.getxCor() + dirX * pushFactor2);
-                                p2.setyCor(p2.getyCor() + dirY * pushFactor2);
-                                p2.setzCor(p2.getzCor() + dirZ * pushFactor2);
-                                
-                                double relativeVelX = p2.getxVel() - p1.getxVel();
-                                double relativeVelY = p2.getyVel() - p1.getyVel();
-                                double relativeVelZ = p2.getzVel() - p1.getzVel();
-                                
-                                double dotProduct = relativeVelX * dirX + relativeVelY * dirY + relativeVelZ * dirZ;
-                                
-                                if (dotProduct < 0) {
-                                    double elasticity = 0.7;
-                                    
-                                    double collisionScale = (1.0 + elasticity) * dotProduct / totalMass;
-                                    double impulseFactorX = collisionScale * dirX;
-                                    double impulseFactorY = collisionScale * dirY;
-                                    double impulseFactorZ = collisionScale * dirZ;
-                                    
-                                    p1.setxVel(p1.getxVel() + impulseFactorX * p2.getMass());
-                                    p1.setyVel(p1.getyVel() + impulseFactorY * p2.getMass());
-                                    p1.setzVel(p1.getzVel() + impulseFactorZ * p2.getMass());
+                // Calculate forces in parallel
+                List<Future<Void>> futures = new ArrayList<>();
+                int chunkSize = particles.size() / NUM_THREADS;
+                for (int i = 0; i < NUM_THREADS; i++) {
+                    int startIndex = i * chunkSize;
+                    int endIndex = (i == NUM_THREADS - 1) ? particles.size() : startIndex + chunkSize;
+                    futures.add(executor.submit(new ForceCalculationTask(startIndex, endIndex, particles)));
+                }
 
-                                    p2.setxVel(p2.getxVel() - impulseFactorX * p1.getMass());
-                                    p2.setyVel(p2.getyVel() - impulseFactorY * p1.getMass());
-                                    p2.setzVel(p2.getzVel() - impulseFactorZ * p1.getMass());
-                                }
-                            }
-                        }
-                    }
-                    for (Particle p : particles) {
-                        p.updateVelocity();
-                    }
-                    
-                    for (Particle p : particles) {
-                        p.updatePos();
-                    }
-                    
-                    for (int i = 0; i < particles.size(); i++) {
-                        Particle p = particles.get(i);
-                        Sphere particleSphere = particleSpheres.get(i);
-                    
-                        particleSphere.setTranslateX(p.getxCor());
-                        particleSphere.setTranslateY(p.getyCor());
-                        particleSphere.setTranslateZ(p.getzCor());
-                    
-                        if (p.getCharge() == 0) {
-                            particleSphere.setMaterial(new PhongMaterial(Color.GRAY)); // Neutral particles
-                        } else if (p.getCharge() > 0) {
-                            particleSphere.setMaterial(new PhongMaterial(Color.RED)); // Positive charge
-                        } else {
-                            particleSphere.setMaterial(new PhongMaterial(Color.BLUE)); // Negative charge
-                        }
+                // Wait for force calculations to complete
+                for (Future<Void> future : futures) {
+                    try {
+                        future.get();
+                    } catch (InterruptedException | java.util.concurrent.ExecutionException e) {
+                        Thread.currentThread().interrupt();
+                        // Log the error appropriately instead of printStackTrace
+                        System.err.println("Error in force calculation: " + e.getMessage());
                     }
                 }
+
+                // Update velocities and positions
+                for (Particle p : particles) {
+                    p.updateVelocity();
+                    p.updatePos();
+                }
+
+                // Update sphere positions on the JavaFX thread
+                for (int i = 0; i < particles.size(); i++) {
+                    Particle p = particles.get(i);
+                    Sphere particleSphere = particleSpheres.get(i);
+                    particleSphere.setTranslateX(p.getxCor());
+                    particleSphere.setTranslateY(p.getyCor());
+                    particleSphere.setTranslateZ(p.getzCor());
+                }
             }
-                
         };
         gameLoop.start();
         // --- 6. Setup and Show the Stage ---
-        primaryStage.setTitle("Simple Empty 3D Scene");
+        primaryStage.setTitle("Particle Simulation");
         primaryStage.setScene(scene);
         primaryStage.show();
+
+        // Bind subscene size to window size
+        subScene.widthProperty().bind(stackPane.widthProperty());
+        subScene.heightProperty().bind(stackPane.heightProperty());
+    }
+
+    @Override
+    public void stop() throws Exception {
+        // Shutdown the thread pool gracefully
+        if (executor != null) {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+            }
+        }
+        super.stop();
     }
 
     private void setupKeyHandlers(Scene scene, Translate pivot) {
         scene.setOnKeyPressed(event -> {
             KeyCode code = event.getCode();
+            double currentMoveSpeed = getScaledMoveSpeed();
     
             // Get the current rotation angles
-            double yaw = Math.toRadians(rotateY.getAngle()); // Rotation around Y-axis (horizontal)
-            double pitch = Math.toRadians(rotateX.getAngle()); // Rotation around X-axis (vertical)
+            double yaw = Math.toRadians(rotateY.getAngle());
+            double pitch = Math.toRadians(rotateX.getAngle());
     
             // Movement vector components
             double forwardX = Math.sin(yaw);
@@ -310,29 +369,29 @@ public class Main extends Application {
             double rightZ = -Math.sin(yaw);
     
             switch (code) {
-                case W: // Move forward
-                    pivot.setX(pivot.getX() + forwardX * MOVE_SPEED);
-                    pivot.setY(pivot.getY() - forwardY * MOVE_SPEED); // Y is inverted
-                    pivot.setZ(pivot.getZ() + forwardZ * MOVE_SPEED);
+                case W:
+                    pivot.setX(pivot.getX() + forwardX * currentMoveSpeed);
+                    pivot.setY(pivot.getY() - forwardY * currentMoveSpeed);
+                    pivot.setZ(pivot.getZ() + forwardZ * currentMoveSpeed);
                     break;
-                case S: // Move backward
-                    pivot.setX(pivot.getX() - forwardX * MOVE_SPEED);
-                    pivot.setY(pivot.getY() + forwardY * MOVE_SPEED); // Y is inverted
-                    pivot.setZ(pivot.getZ() - forwardZ * MOVE_SPEED);
+                case S:
+                    pivot.setX(pivot.getX() - forwardX * currentMoveSpeed);
+                    pivot.setY(pivot.getY() + forwardY * currentMoveSpeed);
+                    pivot.setZ(pivot.getZ() - forwardZ * currentMoveSpeed);
                     break;
-                case A: // Strafe left
-                    pivot.setX(pivot.getX() - rightX * MOVE_SPEED);
-                    pivot.setZ(pivot.getZ() - rightZ * MOVE_SPEED);
+                case A:
+                    pivot.setX(pivot.getX() - rightX * currentMoveSpeed);
+                    pivot.setZ(pivot.getZ() - rightZ * currentMoveSpeed);
                     break;
-                case D: // Strafe right
-                    pivot.setX(pivot.getX() + rightX * MOVE_SPEED);
-                    pivot.setZ(pivot.getZ() + rightZ * MOVE_SPEED);
+                case D:
+                    pivot.setX(pivot.getX() + rightX * currentMoveSpeed);
+                    pivot.setZ(pivot.getZ() + rightZ * currentMoveSpeed);
                     break;
-                case SPACE: // Move up
-                    pivot.setY(pivot.getY() - MOVE_SPEED); // Y is inverted
+                case SPACE:
+                    pivot.setY(pivot.getY() - currentMoveSpeed);
                     break;
-                case SHIFT: // Move down
-                    pivot.setY(pivot.getY() + MOVE_SPEED);
+                case SHIFT:
+                    pivot.setY(pivot.getY() + currentMoveSpeed);
                     break;
                 default:
                     break;
@@ -340,13 +399,13 @@ public class Main extends Application {
         });
     }
 
-     private void setupMouseHandlers(Scene scene) {
-        scene.setOnMousePressed((MouseEvent event) -> {
+     private void setupMouseHandlers(SubScene subScene) {
+        subScene.setOnMousePressed((MouseEvent event) -> {
             lastMouseX = event.getSceneX();
             lastMouseY = event.getSceneY();
         });
 
-        scene.setOnMouseDragged((MouseEvent event) -> {
+        subScene.setOnMouseDragged((MouseEvent event) -> {
             double deltaX = event.getSceneX() - lastMouseX;
             double deltaY = event.getSceneY() - lastMouseY;
 
@@ -360,7 +419,7 @@ public class Main extends Application {
                 newAngleX = 90;
             } else if (newAngleX < -90) {
                 newAngleX = -90;
-            }
+            } 
             rotateX.setAngle(newAngleX);
 
 
@@ -369,11 +428,94 @@ public class Main extends Application {
         });
     }
 
-    private void setupScrollHandler(Scene scene, Translate pivot) {
-        scene.setOnScroll(event -> {
-            double zoomFactor = event.getDeltaY() > 0 ? MOVE_SPEED : -MOVE_SPEED; // Zoom in or out
+    private void setupScrollHandler(SubScene subScene, Translate pivot) {
+        subScene.setOnScroll(event -> {
+            double currentMoveSpeed = getScaledMoveSpeed();
+            double zoomFactor = event.getDeltaY() > 0 ? currentMoveSpeed : -currentMoveSpeed;
             pivot.setZ(pivot.getZ() + zoomFactor);
         });
+    }
+
+    private void spawnParticles() {
+        try {
+            int count = Integer.parseInt(particleCountField.getText());
+            String type = particleTypeComboBox.getValue();
+            
+            for (int i = 0; i < count; i++) {
+                double x = rand.nextDouble() * boundarySize * 2 - boundarySize;
+                double y = rand.nextDouble() * boundarySize * 2 - boundarySize;
+                double z = rand.nextDouble() * boundarySize * 2 - boundarySize;
+                
+                Particle newParticle;
+                switch (type) {
+                    case "electron":
+                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
+                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
+                            electronCharge, electronMass, "electron");
+                        break;
+                    case "proton":
+                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
+                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
+                            protonCharge, protonMass, "proton");
+                        break;
+                    default: // neutron
+                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
+                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
+                            neutronCharge, neutronMass, "neutron");
+                        break;
+                }
+                
+                particles.add(newParticle);
+                
+                Sphere particleSphere = new Sphere(newParticle.getRadius());
+                if (type.equals("electron")) {
+                    particleSphere.setMaterial(electronMaterial);
+                } else if (type.equals("proton")) {
+                    particleSphere.setMaterial(protonMaterial);
+                } else {
+                    particleSphere.setMaterial(neutronMaterial);
+                }
+                particleSpheres.add(particleSphere);
+                root.getChildren().add(particleSphere);
+            }
+        } catch (NumberFormatException e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Invalid Input");
+            alert.setHeaderText(null);
+            alert.setContentText("Please enter a valid number of particles.");
+            alert.showAndWait();
+        }
+    }
+
+    private void clearParticles() {
+        // Remove all sphere objects from the 3D scene
+        root.getChildren().removeAll(particleSpheres);
+        // Clear the collections
+        particles.clear();
+        particleSpheres.clear();
+    }
+
+    private void updateBoundarySize() {
+        try {
+            double newSize = Double.parseDouble(boundarySizeField.getText());
+            if (newSize > 0) {
+                boundarySize = newSize;
+            } else {
+                boundarySizeField.setText(String.valueOf((int)boundarySize));
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Invalid Input");
+                alert.setHeaderText(null);
+                alert.setContentText("Boundary size must be greater than 0");
+                alert.showAndWait();
+            }
+        } catch (NumberFormatException e) {
+            boundarySizeField.setText(String.valueOf((int)boundarySize));
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Invalid Input");
+            alert.setHeaderText(null);
+            alert.setContentText("Please enter a valid number.");
+            alert.showAndWait();
+        }
     }
 
     public static void main(String[] args) {
