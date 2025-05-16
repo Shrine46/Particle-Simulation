@@ -23,6 +23,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
@@ -44,6 +45,8 @@ public class Main extends Application {
     // JavaFx
     private static final double WINDOW_WIDTH = 1000;
     private static final double WINDOW_HEIGHT = 1000;
+    private static final double BASE_TIMESTEP = 0.166666666667; // 60 FPS base timestep
+    private static double timeStep = BASE_TIMESTEP; // Default time step multiplier
 
     private static final double CAMERA_NEAR_CLIP = 0.1;
     private static final double CAMERA_FAR_CLIP = 100000.0; // Increased from 10000 to 100000
@@ -190,6 +193,17 @@ public class Main extends Application {
         Button clearButton = new Button("Clear Particles");
         clearButton.setOnAction(e -> clearParticles());
         
+        // Add timestep slider
+        Label timeStepLabel = new Label("Simulation Speed:");
+        Slider timeStepSlider = new Slider(0.1, 2.0, 1.0);
+        timeStepSlider.setShowTickLabels(true);
+        timeStepSlider.setShowTickMarks(true);
+        timeStepSlider.setMajorTickUnit(0.5);
+        timeStepSlider.setBlockIncrement(0.1);
+        timeStepSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            timeStep = newVal.doubleValue();
+        });
+
         controls.getChildren().addAll(
             countLabel,
             particleCountField,
@@ -198,16 +212,17 @@ public class Main extends Application {
             boundaryLabel,
             boundarySizeField,
             spawnButton,
-            clearButton
+            clearButton,
+            timeStepLabel,
+            timeStepSlider
         );
 
-        // Reduce the number of particles for better performance
+        // Spawn Inital Particles
         for (int i = 0; i < 300; i++) {
             double x = rand.nextDouble() * boundarySize * 2 - boundarySize;
             double y = rand.nextDouble() * boundarySize * 2 - boundarySize;
             double z = rand.nextDouble() * boundarySize * 2 - boundarySize;
 
-            // Add particles with more spacing
             particles.add(new Particle(x, y, z, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), electronCharge, electronMass, "electron"));
             particles.add(new Particle(x + 100, y + 100, z + 100, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), protonCharge, protonMass, "proton"));
             particles.add(new Particle(x - 100, y - 100, z - 100, rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), neutronCharge, neutronMass, "neutron"));
@@ -216,12 +231,10 @@ public class Main extends Application {
         // Pre-create and configure all sphere objects
         for (Particle p : particles) {
             Sphere particleSphere = new Sphere(p.getRadius());
-            if (p.getParticleType().equals("electron")) {
-                particleSphere.setMaterial(electronMaterial);
-            } else if (p.getParticleType().equals("proton")) {
-                particleSphere.setMaterial(protonMaterial);
-            } else {
-                particleSphere.setMaterial(neutronMaterial);
+            switch (p.getParticleType()) {
+                case "electron" -> particleSphere.setMaterial(electronMaterial);
+                case "proton" -> particleSphere.setMaterial(protonMaterial);
+                default -> particleSphere.setMaterial(neutronMaterial);
             }
             particleSpheres.add(particleSphere);
             root.getChildren().add(particleSphere);
@@ -303,18 +316,18 @@ public class Main extends Application {
                         future.get();
                     } catch (InterruptedException | java.util.concurrent.ExecutionException e) {
                         Thread.currentThread().interrupt();
-                        // Log the error appropriately instead of printStackTrace
                         System.err.println("Error in force calculation: " + e.getMessage());
                     }
                 }
 
-                // Update velocities and positions
+                double currentTimeStep = BASE_TIMESTEP * timeStep;
+                // Update velocities and positions with scaled timestep
                 for (Particle p : particles) {
-                    p.updateVelocity();
-                    p.updatePos();
+                    p.updateVelocity(currentTimeStep);
+                    p.updatePos(currentTimeStep);
                 }
 
-                // Update sphere positions on the JavaFX thread
+                // Update sphere positions
                 for (int i = 0; i < particles.size(); i++) {
                     Particle p = particles.get(i);
                     Sphere particleSphere = particleSpheres.get(i);

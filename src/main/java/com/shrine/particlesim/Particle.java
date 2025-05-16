@@ -39,10 +39,7 @@ public class Particle {
         this(xCor, yCor, 0, xVel, yVel, 0, charge, mass, particleType);
     }
 
-    public void updatePos() {
-        // may come back to this but will keep time as 60fps
-        double time = 0.166666666667; // mult by 10 for sim is super slow
-
+    public void updatePos(double timeStep) {
         // Get max speed from Main class
         double maxSpeed = Main.getMaxSpeed();
 
@@ -58,10 +55,10 @@ public class Particle {
         yVel *= .90;
         zVel *= .90;
 
-        // Update position
-        xCor += xVel * time;
-        yCor += yVel * time;
-        zCor += zVel * time;
+        // Update position using timeStep
+        xCor += xVel * timeStep;
+        yCor += yVel * timeStep;
+        zCor += zVel * timeStep;
 
         // Get current boundary size from Main class
         double boundary = Main.getBoundarySize();
@@ -92,16 +89,14 @@ public class Particle {
         }
     }
 
-    public void updateVelocity() {
-        double time = 0.166666666667; // mult by 10 for sim is super slow
-
+    public void updateVelocity(double timeStep) {
         if (this.mass == 0) return;
         double accelX = this.netX / this.mass;
         double accelY = this.netY / this.mass;
         double accelZ = this.netZ / this.mass;
-        this.xVel += accelX * time;
-        this.yVel += accelY * time;
-        this.zVel += accelZ * time;
+        this.xVel += accelX * timeStep;
+        this.yVel += accelY * timeStep;
+        this.zVel += accelZ * timeStep;
     }
 
     public double[] calculateForces(Particle p2) {
@@ -177,7 +172,9 @@ public class Particle {
 
         // Strong Force
         if ((p1.isNucleon() && p2.isNucleon()) && dist <= strongForceOuterRadius) {
-            double strongForce = strongForceConstant / (distsq * dist);
+            double protonRadius = 9.0;
+            double decayFactor = Math.exp(-(dist - protonRadius) / protonRadius);
+            double strongForce = (strongForceConstant / (distsq * dist)) * decayFactor;
             double strongForceX, strongForceY, strongForceZ;
 
             if (dist < strongForceInnerRadius) {
