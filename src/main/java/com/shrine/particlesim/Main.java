@@ -462,39 +462,40 @@ public class Main extends Application {
                 Particle newParticle;
                 switch (type) {
                     case "electron":
-                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
-                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
-                            electronCharge, electronMass, "electron");
+                        newParticle = new Particle(x, y, z, 0, 0, 0, electronCharge, electronMass, "electron");
                         break;
                     case "proton":
-                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
-                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
-                            protonCharge, protonMass, "proton");
+                        newParticle = new Particle(x, y, z, 0, 0, 0, protonCharge, protonMass, "proton");
                         break;
                     default: // neutron
-                        newParticle = new Particle(x, y, z, rand.nextDouble(-5, 5), 
-                            rand.nextDouble(-5, 5), rand.nextDouble(-5, 5), 
-                            neutronCharge, neutronMass, "neutron");
+                        newParticle = new Particle(x, y, z, 0, 0, 0, neutronCharge, neutronMass, "neutron");
                         break;
                 }
                 
                 particles.add(newParticle);
                 
-                Sphere particleSphere = new Sphere(newParticle.getRadius());
+                Sphere sphere = new Sphere(newParticle.getRadius());
+                
+                // Set material based on particle type
                 if (type.equals("electron")) {
-                    particleSphere.setMaterial(electronMaterial);
+                    sphere.setMaterial(electronMaterial);
                 } else if (type.equals("proton")) {
-                    particleSphere.setMaterial(protonMaterial);
+                    sphere.setMaterial(protonMaterial);
                 } else {
-                    particleSphere.setMaterial(neutronMaterial);
+                    sphere.setMaterial(neutronMaterial);
                 }
-                particleSpheres.add(particleSphere);
-                root.getChildren().add(particleSphere);
+                
+                sphere.setTranslateX(x);
+                sphere.setTranslateY(y);
+                sphere.setTranslateZ(z);
+                
+                particleSpheres.add(sphere);
+                root.getChildren().add(sphere);
             }
         } catch (NumberFormatException e) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Invalid Input");
-            alert.setHeaderText(null);
+            alert.setHeaderText("Invalid number format");
             alert.setContentText("Please enter a valid number of particles.");
             alert.showAndWait();
         }
@@ -506,6 +507,8 @@ public class Main extends Application {
         // Clear the collections
         particles.clear();
         particleSpheres.clear();
+        // Clear the nuclei list
+        ForceCalculationTask.clearNuclei();
     }
 
     private void updateBoundarySize() {

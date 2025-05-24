@@ -1,0 +1,592 @@
+// Okay, this is a fantastic and ambitious project! You've got a solid foundation with the particle interactions. Let's break down how to approach nuclear stability, decay, and electron behavior in your simulation.
+
+// You're right, summing forces or charges won't tell you if a nucleus is stable. Nuclear stability is a quantum mechanical phenomenon governed by the interplay of the strong force, electromagnetic force, and the Pauli Exclusion Principle, leading to concepts like binding energy and nuclear shell models.
+
+// Here's a strategy, building on what ChatGPT suggested, tailored to your existing code:
+
+// Phase 1: Identifying Nuclei and Basic Decay
+
+//     Nucleus Class (or similar concept):
+//     You need a way to represent a bound group of protons and neutrons. This could be a new class Nucleus or you could add properties to your Particle class if a particle can "become" a nucleus (less ideal, but possible).
+
+          
+    // In a new file: Nucleus.java
+    package com.shrine.particlesim;
+
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.Random;
+    import java.util.stream.Collectors;
+
+    public class Nucleus {
+        private List<Particle> nucleons; // Protons and neutrons
+        public int Z; // Proton count
+        public int N; // Neutron count
+        public int A; // Mass number (Z + N)
+        private double averageX, averageY, averageZ; // Center of mass/position
+        private long creationTime; // Timestamp for decay checks
+        private static final long NEUTRON_HALF_LIFE_SIM_TICKS = 15 * 60 * 60; // Approx 15 minutes in simulation ticks (assuming 60 FPS)
+        private static Random rand = new Random();
+
+        // Particles that were emitted from this nucleus (for visualization or further interaction)
+        private List<Particle> emittedParticles = new ArrayList<>();
+
+        public Nucleus(List<Particle> constituentParticles) {
+            this.nucleons = new ArrayList<>(constituentParticles);
+            recalculateCompositionAndPosition();
+            this.creationTime = System.nanoTime(); // Or use simulation ticks
+        }
+
+        public void recalculateCompositionAndPosition() {
+            this.Z = 0;
+            this.N = 0;
+            double totalMass = 0;
+            double sumX = 0, sumY = 0, sumZ = 0;
+
+            List<Particle> toRemove = new ArrayList<>();
+            for (Particle p : nucleons) {
+                if (p.getParticleType().equals("proton")) {
+                    this.Z++;
+                } else if (p.getParticleType().equals("neutron")) {
+                    this.N++;
+                } else {
+                    // Should not happen if only nucleons are added
+                    System.err.println("Warning: Non-nucleon found in Nucleus: " + p.getParticleType());
+                    toRemove.add(p); // Mark for removal
+                    continue;
+                }
+                sumX += p.getxCor() * p.getMass();
+                sumY += p.getyCor() * p.getMass();
+                sumZ += p.getzCor() * p.getMass();
+                totalMass += p.getMass();
+            }
+            nucleons.removeAll(toRemove); // Remove any non-nucleons
+
+            this.A = this.Z + this.N;
+            if (totalMass > 0) {
+                this.averageX = sumX / totalMass;
+                this.averageY = sumY / totalMass;
+                this.averageZ = sumZ / totalMass;
+            } else if (!nucleons.isEmpty()) { // if somehow mass is zero but particles exist
+                this.averageX = nucleons.get(0).getxCor();
+                this.averageY = nucleons.get(0).getyCor();
+                this.averageZ = nucleons.get(0).getzCor();
+            } else { // Empty nucleus
+                this.averageX = 0;
+                this.averageY = 0;
+                this.averageZ = 0;
+            }
+        }
+
+        public List<Particle> getNucleons() {
+            return nucleons;
+        }
+
+        public double getX() { return averageX; }
+        public double getY() { return averageY; }
+        public double getZ_pos() { return averageZ; } // Renamed to avoid conflict with proton count Z
+
+        public boolean isStable() {
+            if (A == 0) return true; // Empty or invalid
+            if (Z == 0 && N > 0) return false; // Blob of neutrons (except for single free neutron handled elsewhere)
+
+            // Known stable isotopes (examples)
+            if (Z == 1 && (N == 0 || N == 1 || N == 2)) return true; // H-1, H-2 (Deuterium), H-3 (Tritium - technically beta decays but long half-life)
+            if (Z == 2 && (N == 1 || N == 2)) return true; // He-3, He-4
+            if (Z == 6 && N == 6) return true; // Carbon-12
+            if (Z == 8 && N == 8) return true; // Oxygen-16
+
+            // General rules of thumb (simplified from Chart of Nuclides)
+            if (Z <= 20) { // Light elements
+                return N >= Z - 1 && N <= Z + (Z > 8 ? 3 : 2); // N roughly equals Z, a bit more neutrons allowed for heavier ones
+            } else if (Z <= 82) { // Medium elements
+                // Neutron/proton ratio increases
+                double ratio = (double) N / Z;
+                return ratio >= 1.0 && ratio <= 1.55 + (Z-20)*0.005; // Crude approximation
+            }
+            return false; // Heavy elements beyond lead are generally unstable (alpha emitters)
+        }
+
+        // Call this method in your main simulation loop
+        public List<Particle> attemptDecay(List<Particle> allParticles, Group root, ArrayList<Sphere> particleSpheres) {
+            emittedParticles.clear();
+            if (isStable() || nucleons.isEmpty()) {
+                return emittedParticles;
+            }
+
+            // BETA-MINUS DECAY (Neutron-rich)
+            // Simplified: if N/Z is "too high" for its Z
+            double targetRatioMax = (Z <= 20) ? ( (Z > 8) ? 1.3 : 1.1) : (1.55 + (Z-20)*0.005);
+            if (N > 0 && ( (double)N/Z > targetRatioMax || (Z == 0 && N > 0) ) ) {
+                if (rand.nextDouble() < 0.01) { // Probabilistic decay per tick
+                    System.out.println("Attempting Beta-Minus Decay for nucleus Z=" + Z + ", N=" + N);
+                    Particle neutronToDecay = nucleons.stream().filter(p -> p.getParticleType().equals("neutron")).findAny().orElse(null);
+                    if (neutronToDecay != null) {
+                        // 1. Change neutron to proton
+                        neutronToDecay.setParticleType("proton");
+                        neutronToDecay.setCharge(Main.protonCharge);
+                        // Update its visual representation if necessary (see Main class for how you handle sphere materials)
+                        // You'll need a way to find the sphere for this particle and change its material.
+
+                        // 2. Emit electron
+                        Particle electron = new Particle(neutronToDecay.getxCor(), neutronToDecay.getyCor(), neutronToDecay.getzCor(),
+                                (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20, // Give it some velocity
+                                Main.electronCharge, Main.electronMass, "electron");
+                        emittedParticles.add(electron);
+
+                        // 3. Emit antineutrino (often ignored in simple sims, but good to acknowledge)
+                        // Particle antineutrino = new Particle(... "antineutrino");
+                        // emittedParticles.add(antineutrino);
+
+                        System.out.println("Beta-Minus Decay: n -> p + e- (+ antineutrino). New Z=" + (Z+1) + ", N=" + (N-1));
+                        recalculateCompositionAndPosition();
+                        return emittedParticles;
+                    }
+                }
+            }
+
+            // BETA-PLUS DECAY (Proton-rich) - Less common for light, naturally occurring
+            double targetRatioMin = (Z <= 20) ? 0.9 : 1.0;
+            if (Z > 0 && (double)N/Z < targetRatioMin && Z > N) {
+                 if (rand.nextDouble() < 0.005) { // Probabilistic decay per tick
+                    System.out.println("Attempting Beta-Plus Decay for nucleus Z=" + Z + ", N=" + N);
+                    Particle protonToDecay = nucleons.stream().filter(p -> p.getParticleType().equals("proton")).findAny().orElse(null);
+                    if (protonToDecay != null && Z > 1) { // Need Z > 1 for stability of resulting nucleus usually
+                        protonToDecay.setParticleType("neutron");
+                        protonToDecay.setCharge(Main.neutronCharge);
+
+                        Particle positron = new Particle(protonToDecay.getxCor(), protonToDecay.getyCor(), protonToDecay.getzCor(),
+                                (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20,
+                                Main.protonCharge, Main.electronMass, "positron"); // Positron has positive charge, electron mass
+                        emittedParticles.add(positron);
+                        // Particle neutrino = new Particle(... "neutrino");
+                        // emittedParticles.add(neutrino);
+                        System.out.println("Beta-Plus Decay: p -> n + e+ (+ neutrino). New Z=" + (Z-1) + ", N=" + (N+1));
+                        recalculateCompositionAndPosition();
+                        return emittedParticles;
+                    }
+                }
+            }
+
+
+            // ALPHA DECAY (Heavy nuclei)
+            if (Z > 82 && A > 200) { // Common for Z > 82 (Lead)
+                if (rand.nextDouble() < 0.001) { // Probabilistic
+                     System.out.println("Attempting Alpha Decay for nucleus Z=" + Z + ", N=" + N);
+                    if (Z >= 2 && N >= 2) {
+                        // 1. Create alpha particle (2p, 2n)
+                        Particle alphaParticle = new Particle(averageX, averageY, averageZ,
+                                (rand.nextDouble() - 0.5) * 5, (rand.nextDouble() - 0.5) * 5, (rand.nextDouble() - 0.5) * 5, // Slow, massive
+                                Main.protonCharge * 2, (Main.protonMass * 2 + Main.neutronMass * 2), "alpha");
+                        // For simulation, you might model an alpha particle as a single particle
+                        // or as a tightly bound He-4 nucleus that quickly forms.
+                        // For simplicity, treat it as one new particle type "alpha".
+                        // You'll need a material for it.
+                        emittedParticles.add(alphaParticle);
+
+                        // 2. Remove 2 protons and 2 neutrons from this nucleus
+                        removeNucleons("proton", 2);
+                        removeNucleons("neutron", 2);
+
+                        System.out.println("Alpha Decay: Emitted Alpha. New Z=" + (Z-2) + ", N=" + (N-2));
+                        recalculateCompositionAndPosition();
+
+                        // If the nucleus is now empty, it should be flagged for removal
+                        if (nucleons.isEmpty()) {
+                            System.out.println("Nucleus empty after alpha decay.");
+                            // The main loop will handle removing empty nuclei
+                        }
+                        return emittedParticles;
+                    }
+                }
+            }
+            return emittedParticles;
+        }
+
+        private void removeNucleons(String type, int count) {
+            List<Particle> toRemove = nucleons.stream()
+                .filter(p -> p.getParticleType().equals(type))
+                .limit(count)
+                .collect(Collectors.toList());
+
+            for (Particle p : toRemove) {
+                // Crucially, these particles need to be removed from the main simulation lists too
+                // This is tricky. The Nucleus class shouldn't directly manipulate `Main.particles`
+                // Instead, the main loop should handle this based on the state of the Nucleus.
+                // For now, just remove from internal list. The main loop will need to synchronize.
+                Main.removeParticleGlobally(p); // You'll need to implement this in Main
+            }
+            nucleons.removeAll(toRemove);
+        }
+
+        // For free neutron decay
+        public static List<Particle> checkFreeNeutronDecay(Particle neutron, long currentTick) {
+            List<Particle> emitted = new ArrayList<>();
+            // Check if it's actually a free neutron (not part of a nucleus)
+            // This check should ideally happen in the main loop before forming nuclei.
+            // For simplicity here, assume this method is only called on "known" free neutrons.
+
+            // Simplified half-life check
+            // Each tick, there's a chance based on half-life.
+            // Decay probability per tick P = 1 - (0.5)^(ticks_per_second / (half_life_seconds * ticks_per_second))
+            // P = 1 - 2^(-dt/T_half) approx ln(2)*dt/T_half for small dt/T_half
+            double decayConstant = Math.log(2.0) / (14.7 * 60.0 * Main.getFPS()); // lambda = ln(2)/T_half (T_half in seconds)
+                                                                              // decay_prob_per_tick = lambda * (1/FPS)
+            if (rand.nextDouble() < decayConstant) {
+                 System.out.println("Free neutron decaying!");
+                neutron.setParticleType("proton");
+                neutron.setCharge(Main.protonCharge);
+                // Update sphere material in Main
+
+                Particle electron = new Particle(neutron.getxCor(), neutron.getyCor(), neutron.getzCor(),
+                        (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20, (rand.nextDouble() - 0.5) * 20,
+                        Main.electronCharge, Main.electronMass, "electron");
+                emitted.add(electron);
+                // Antineutrino ...
+            }
+            return emitted;
+        }
+    }
+
+        
+
+    IGNORE_WHEN_COPYING_START
+
+Use code with caution. Java
+IGNORE_WHEN_COPYING_END
+
+Detecting Nuclei Formation in Main.java:
+This is the most challenging part. How do you know when a collection of free protons and neutrons has become a nucleus?
+
+    Proximity and Strong Force: Your Particle class already has isNucleon() and strong force calculations.
+
+    Clustering Algorithm:
+
+        In your main loop, after particle positions are updated:
+
+        Iterate through all nucleons. If a nucleon isn't already part of a Nucleus:
+
+            Start a "cluster search" (like a Breadth-First Search or Depth-First Search). Find all other nucleons connected to it by the strong force (i.e., within STRONG_FORCE_OUTER_RADIUS).
+
+            If a cluster is found, create a Nucleus object from these particles.
+
+            Mark these particles as "belonging" to this nucleus to avoid re-processing them.
+
+    You'll need a list of active Nucleus objects: private static final List<Nucleus> nuclei = new ArrayList<>();
+
+Simplified Nucleus Detection (in Main.java game loop):
+
+      
+// In Main.java, inside AnimationTimer's handle() method,
+// probably after particle updates and before rendering.
+// This is a VERY simplified clustering. More robust methods exist (e.g., DBSCAN)
+
+// Add a list to store identified nuclei
+// private static List<Nucleus> activeNuclei = new ArrayList<>();
+// Add a set to keep track of particles already in a nucleus
+// private static Set<Particle> particlesInNuclei = new HashSet<>();
+
+// Inside handle() method:
+detectAndFormNuclei();
+processNucleiDecay();
+processFreeNeutronDecay(); // For neutrons not in nuclei
+
+// Then, when you update sphere positions, if a particle is in a nucleus,
+// you might want to draw the nucleus as a single entity or ensure its constituents stay very close.
+// For now, individual particle updates will continue, and the strong force should keep them clumped.
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Java
+IGNORE_WHEN_COPYING_END
+
+      
+// New method in Main.java
+private static final double NUCLEUS_FORMATION_DISTANCE_SQ = Math.pow(Main.getStrongForceOuterRadius() * 1.5, 2); // A bit more than strong force
+
+private void detectAndFormNuclei() {
+    List<Particle> potentialNucleons = new ArrayList<>();
+    for (Particle p : particles) {
+        if (p.isNucleon() && !particlesInNuclei.contains(p)) {
+            potentialNucleons.add(p);
+        }
+    }
+
+    List<Particle> processedInThisStep = new ArrayList<>(); // Avoid concurrent modification issues
+
+    while (!potentialNucleons.isEmpty()) {
+        Particle seed = potentialNucleons.remove(0);
+        if (processedInThisStep.contains(seed)) continue;
+
+        List<Particle> currentCluster = new ArrayList<>();
+        currentCluster.add(seed);
+        processedInThisStep.add(seed);
+
+        List<Particle> toCheck = new ArrayList<>(currentCluster); // Queue for BFS-like search
+
+        while(!toCheck.isEmpty()){
+            Particle currentNucleon = toCheck.remove(0);
+            for (Particle otherNucleon : potentialNucleons) {
+                if (processedInThisStep.contains(otherNucleon)) continue;
+
+                double dx = currentNucleon.getxCor() - otherNucleon.getxCor();
+                double dy = currentNucleon.getyCor() - otherNucleon.getyCor();
+                double dz = currentNucleon.getzCor() - otherNucleon.getzCor();
+                double distSq = dx*dx + dy*dy + dz*dz;
+
+                if (distSq < NUCLEUS_FORMATION_DISTANCE_SQ) {
+                    currentCluster.add(otherNucleon);
+                    processedInThisStep.add(otherNucleon);
+                    toCheck.add(otherNucleon); // Add to queue
+                }
+            }
+        }
+         potentialNucleons.removeAll(processedInThisStep);
+
+
+        if (currentCluster.size() > 1) { // Only form nucleus if more than one nucleon
+            System.out.println("Forming nucleus with " + currentCluster.size() + " nucleons.");
+            Nucleus newNucleus = new Nucleus(new ArrayList<>(currentCluster)); // Pass a copy
+            activeNuclei.add(newNucleus);
+            particlesInNuclei.addAll(currentCluster);
+        }
+    }
+
+    // Maintenance: Remove nuclei if their constituent particles have drifted too far
+    // or if the nucleus has become empty after decay.
+    List<Nucleus> nucleiToRemove = new ArrayList<>();
+    for (Nucleus nuc : activeNuclei) {
+        nuc.recalculateCompositionAndPosition(); // Update Z, N, A
+        if (nuc.getNucleons().isEmpty()) {
+            nucleiToRemove.add(nuc);
+            continue;
+        }
+        // Optional: Check if nucleons have drifted apart (strong force failed)
+        // If so, dissolve nucleus and return particles to the main list.
+    }
+    for (Nucleus nucToRemove : nucleiToRemove) {
+        System.out.println("Removing empty nucleus.");
+        activeNuclei.remove(nucToRemove);
+        // particlesInNuclei will be updated naturally as particles are removed/added
+    }
+}
+
+private void processNucleiDecay() {
+    List<Particle> newlyEmittedParticles = new ArrayList<>();
+    List<Nucleus> nucleiToRemove = new ArrayList<>(); // For nuclei that fully decay
+
+    for (Nucleus nuc : activeNuclei) {
+        List<Particle> emitted = nuc.attemptDecay(particles, root, particleSpheres);
+        if (!emitted.isEmpty()) {
+            System.out.println("Nucleus Z=" + nuc.Z + ", N=" + nuc.N + " emitted " + emitted.size() + " particles.");
+            for (Particle newP : emitted) {
+                // Add to main simulation
+                particles.add(newP);
+                Sphere newSphere = new Sphere(newP.getRadius());
+                // Set material based on newP.getParticleType()
+                if (newP.getParticleType().equals("electron")) newSphere.setMaterial(electronMaterial);
+                else if (newP.getParticleType().equals("positron")) { // Add positron material
+                    PhongMaterial positronMaterial = new PhongMaterial(Color.CYAN); // Example
+                    newSphere.setMaterial(positronMaterial);
+                } else if (newP.getParticleType().equals("alpha")) { // Add alpha material
+                     PhongMaterial alphaMaterial = new PhongMaterial(Color.YELLOW); // Example
+                    newSphere.setMaterial(alphaMaterial);
+                }
+                // else if antineutrino etc. (likely invisible)
+                particleSpheres.add(newSphere);
+                root.getChildren().add(newSphere);
+                newlyEmittedParticles.add(newP);
+            }
+        }
+        if (nuc.getNucleons().isEmpty() && nuc.A > 0) { // Was a nucleus, now it's empty
+             nucleiToRemove.add(nuc);
+        }
+    }
+    activeNuclei.removeAll(nucleiToRemove);
+}
+
+// Method to handle removing particles that decayed FROM a nucleus
+public static synchronized void removeParticleGlobally(Particle pToRemove) {
+    int index = particles.indexOf(pToRemove);
+    if (index != -1) {
+        particles.remove(index);
+        Sphere sphereToRemove = particleSpheres.remove(index);
+        // Must be run on JavaFX Application Thread if root is modified
+        // Platform.runLater(() -> root.getChildren().remove(sphereToRemove));
+        // For now, let's assume this is called from a context that can modify root,
+        // or queue it. Simpler to just remove from lists for now and handle visuals later if issues.
+        // A placeholder:
+        // System.out.println("Particle " + pToRemove.getParticleType() + " visually removed (placeholder).");
+        // Actual removal from root needs careful FX thread handling.
+        // A safer way is to have a list of spheres to remove, and process that in the animation timer on FX thread.
+        // For now, we'll just remove from the lists. The sphere will become an orphan but won't crash.
+    }
+    particlesInNuclei.remove(pToRemove);
+}
+
+
+private void processFreeNeutronDecay() {
+    List<Particle> newlyCreatedParticles = new ArrayList<>();
+    List<Particle> neutronsToProcess = new ArrayList<>();
+
+    for(Particle p : particles){
+        if(p.getParticleType().equals("neutron") && !particlesInNuclei.contains(p)){
+            neutronsToProcess.add(p);
+        }
+    }
+
+    for (Particle neutron : neutronsToProcess) {
+        List<Particle> emitted = Nucleus.checkFreeNeutronDecay(neutron, 0 /* pass sim tick here */);
+        if (!emitted.isEmpty()) {
+            // Neutron has now become a proton, update its sphere material
+            int neutronIndex = particles.indexOf(neutron);
+            if (neutronIndex != -1 && neutronIndex < particleSpheres.size()) {
+                Sphere s = particleSpheres.get(neutronIndex);
+                // Platform.runLater(() -> s.setMaterial(protonMaterial)); // If on different thread
+                 s.setMaterial(protonMaterial); // If on FX thread
+            }
+
+            for (Particle newP : emitted) {
+                particles.add(newP);
+                Sphere newSphere = new Sphere(newP.getRadius());
+                 if (newP.getParticleType().equals("electron")) newSphere.setMaterial(electronMaterial);
+                // else if positron etc.
+                particleSpheres.add(newSphere);
+                root.getChildren().add(newSphere); // Assumes called from FX thread
+                newlyCreatedParticles.add(newP);
+            }
+        }
+    }
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+
+    Use code with caution. Java
+    IGNORE_WHEN_COPYING_END
+
+    Important: Modifying root.getChildren() or particleSpheres materials from a non-JavaFX thread will cause issues. The decay logic might run in your main simulation thread. You'd need to use Platform.runLater(...) for UI updates, or collect changes and apply them in the AnimationTimer.handle(). For now, I've simplified, assuming handle() is where this runs.
+
+    Decay Implementation in Nucleus.java: (Shown above)
+
+Phase 2: Electron Shells and Energy (Highly Simplified)
+
+Electrons in atoms don't "orbit" like planets. They exist in probability clouds (orbitals) with quantized energy levels. Simulating this accurately is PhD-level quantum chemistry.
+
+    Simplification 1: "Binding"
+
+        When an electron gets close to a nucleus and has relatively low kinetic energy (compared to the Coulomb attraction), consider it "bound."
+
+        You could add a Nucleus boundTo = null; field to your Particle class (for electrons).
+
+        In your Particle.updatePos, if an electron is bound, its movement could be constrained or influenced more strongly by the nucleus.
+
+    Simplification 2: "Energy Levels" as Distance/Speed
+
+        You could try to implement a few discrete "shells" (target distances from the nucleus).
+
+        Energy: For a bound electron, its energy could be a combination of its kinetic energy (relative to the nucleus) and its potential energy (due to Coulomb attraction: U = k * q1*q2 / r).
+
+        E_total = KE_relative + PE.
+
+        If E_total < 0, it's generally considered bound.
+
+        Higher energy (less negative E_total) could mean it "tries" to maintain a larger average distance.
+
+        This is very hand-wavy. A simpler visual might be just to have electrons swirl around nuclei if their net force is attractive. Your current "swirl effect" is a good starting point for this visual.
+
+    Calculating Kinetic Energy of an Electron:
+    KE = 0.5 * electron.getMass() * (electron.getxVel()*electron.getxVel() + electron.getyVel()*electron.getyVel() + electron.getzVel()*electron.getzVel());
+    If it's "bound" to a nucleus, you might want its KE relative to the nucleus's velocity.
+
+Phase 3: Photon Emission (Visual Effect)
+
+    If an electron is "bound" and it "drops" to a "lower energy state" (e.g., moves closer to the nucleus or slows down significantly while remaining bound), you could emit a "photon."
+
+    A photon in your sim could be:
+
+        A temporary visual effect (a flash of light at the atom's position).
+
+        A very fast, massless, chargeless particle that travels in a straight line and then disappears.
+
+    Trigger: If an electron transitions from a high KE_relative to a low KE_relative while bound, emit photon.
+
+    This is mostly for visual appeal unless you want photons to interact with other particles (e.g., photoelectric effect, which would be another layer of complexity).
+
+Implementation Steps and Considerations:
+
+    Nucleus Class: Create it. Implement constructor, recalculateCompositionAndPosition, and a basic isStable() (you can refine stability rules later).
+
+    Nucleus Detection: In Main.java, add activeNuclei list and particlesInNuclei set. Implement a basic version of detectAndFormNuclei(). This will be iterative to get right.
+
+    Free Neutron Decay: Implement Nucleus.checkFreeNeutronDecay() and call it from Main.java for non-clustered neutrons.
+
+    Beta Decay: Implement beta-minus decay in Nucleus.attemptDecay(). Test this thoroughly. Particles created (electron) need to be added to your main particles list and have Sphere objects created.
+
+    Alpha Decay: Add alpha decay to Nucleus.attemptDecay().
+
+    Particle Removal: When nucleons are removed from a Nucleus (e.g. in alpha decay, or if a nucleus dissolves), they need to be properly removed from Main.particles, Main.particleSpheres, and root.getChildren(). The removeParticleGlobally method is a starting point.
+
+    Visuals:
+
+        How do you represent a Nucleus? For now, its constituent particles are still drawn.
+
+        When a particle changes type (n to p), its Sphere material needs to change.
+
+    Electron Binding (Later):
+
+        Once nuclei are forming and decaying, think about how electrons "bind." This is more about modifying their behavior in Particle.updatePos if they are close to a nucleus and conditions are met.
+
+        Your "swirl effect" is a good step. You could make it stronger or more persistent if an electron's total energy (KE+PE relative to nucleus) is negative.
+
+    Threading: Be very careful about modifying JavaFX scene graph elements (root, Sphere materials) from threads other than the JavaFX Application Thread. Use Platform.runLater() if necessary. Your ForceCalculationTask is on a separate thread. Decay logic might also be.
+
+Where to put the new logic in Main.java's AnimationTimer:
+
+      
+// Inside AnimationTimer.handle(long now)
+
+// 1. Reset forces (as you have)
+particles.parallelStream().forEach(Particle::resetForce);
+
+// 2. Calculate forces (as you have, using ForceCalculationTask)
+// ... wait for futures ...
+
+// 3. Update velocities and positions (as you have)
+// ...
+
+// --- NEW PHYSICS STEPS ---
+// 4. Nucleus Management and Decay
+synchronized (particles) { // Synchronize if other threads might modify 'particles'
+                           // or 'activeNuclei', 'particlesInNuclei'
+    detectAndFormNuclei();    // Identify and create new Nucleus objects
+    processNucleiDecay();     // Existing nuclei attempt to decay
+    processFreeNeutronDecay();// Free neutrons attempt to decay
+}
+// Make sure newly emitted particles from decay are added to the main 'particles' list
+// and have Spheres created for them before the next step.
+// The processNucleiDecay and processFreeNeutronDecay should handle this.
+
+// 5. Electron binding / energy checks (Optional, advanced)
+// ... if (electron.isBoundTo(nucleus)) { adjustBehavior(); } ...
+
+// 6. Update sphere positions and visuals (as you have, but now includes newly decayed particles)
+// ...
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Java
+IGNORE_WHEN_COPYING_END
+
+This is a big task. Start small:
+
+    Get Nucleus objects forming from clumps of 2+ nucleons.
+
+    Implement free neutron decay.
+
+    Implement beta-minus decay for unstable nuclei.
+
+Good luck! This is a really cool simulation you're building.

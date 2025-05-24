@@ -1,5 +1,6 @@
 package com.shrine.particlesim;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -10,6 +11,7 @@ public class ForceCalculationTask implements Callable<Void> {
     private final double[] batchForceX;
     private final double[] batchForceY;
     private final double[] batchForceZ;
+    private static final List<Nucleus> nuclei = new ArrayList<>(); // Changed to static to persist across tasks
 
     public ForceCalculationTask(int startIndex, int endIndex, List<Particle> particles) {
         this.startIndex = startIndex;
@@ -22,6 +24,10 @@ public class ForceCalculationTask implements Callable<Void> {
 
     @Override
     public Void call() {
+        // Only detect nuclei in the first task to avoid duplicate detection
+        if (startIndex == 0) {
+            detectNuclei();
+        }
         for (int i = startIndex; i < endIndex; i++) {
             for (int j = i + 1; j < particles.size(); j++) {
                 Particle p1 = particles.get(i);
@@ -60,6 +66,72 @@ public class ForceCalculationTask implements Callable<Void> {
             }
         }
         return null;
+    }
+
+    private void detectNuclei() {
+        if (startIndex != 0) return; // Only process in first task
+        
+        // Remove empty nuclei and update centers of existing ones
+        nuclei.removeIf(Nucleus::isEmpty);
+        for (Nucleus n : nuclei) {
+            n.updateCenter();
+        }
+        
+        // First pass: try to add nucleons to existing nuclei
+        for (int i = 0; i < particles.size(); i++) {
+            Particle p = particles.get(i);
+            if (!p.isNucleon()) continue;
+            
+            boolean added = false;
+            for (Nucleus nucleus : nuclei) {
+                if (nucleus.isCloseToNucleus(p)) {
+                    nucleus.addNucleon(p);
+                    added = true;
+                    break;
+                }
+            }
+            
+            // If not added to any existing nucleus, check if it can form a new one
+            if (!added) {
+                for (int j = i + 1; j < particles.size(); j++) {
+                    Particle p2 = particles.get(j);
+                    if (!p2.isNucleon()) continue;
+                    
+                    // Check if p2 is already in a nucleus
+                    boolean p2InNucleus = false;
+                    for (Nucleus n : nuclei) {
+                        if (n.containsNucleon(p2)) {
+                            p2InNucleus = true;
+                            break;
+                        }
+                    }
+                    if (p2InNucleus) continue;
+                    
+                    double distX = p2.getxCor() - p.getxCor();
+                    double distY = p2.getyCor() - p.getyCor();
+                    double distZ = p2.getzCor() - p.getzCor();
+                    double distSq = distX * distX + distY * distY + distZ * distZ;
+                    
+                    double maxDistance = p.getRadius() * 2;
+                    if (distSq <= maxDistance * maxDistance) {
+                        // Create new nucleus with these two particles
+                        Nucleus newNucleus = new Nucleus();
+                        newNucleus.addNucleon(p);
+                        newNucleus.addNucleon(p2);
+                        nuclei.add(newNucleus);
+                        System.out.println("New nucleus formed! Protons: " + newNucleus.getProtonCount() + 
+                                         ", Neutrons: " + newNucleus.getNeutronCount());
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Print status of all nuclei
+        for (Nucleus n : nuclei) {
+            System.out.println("Nucleus status - Protons: " + n.getProtonCount() + 
+                             ", Neutrons: " + n.getNeutronCount());
+        }
     }
 
     private void handleCollision(Particle p1, Particle p2, double distX, double distY, double distZ, double distSq) {
@@ -111,5 +183,9 @@ public class ForceCalculationTask implements Callable<Void> {
                 p2.setzVel(p2.getzVel() - impulseFactorZ * p1.getMass());
             }
         }
+    }
+    
+    public static void clearNuclei() {
+        nuclei.clear();
     }
 }
